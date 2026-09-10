@@ -1,12 +1,17 @@
 import { readFile, readdir, stat } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { Assessment } from "@scorm-quiz/schemas";
 import { buildPackage, buildRuntimeConfig, generateManifest, type PackageFile } from "@scorm-quiz/scorm-export";
 
+const moduleDir = path.dirname(fileURLToPath(import.meta.url));
+
 /** Directory containing the pre-built learner runtime (apps/runtime's Vite
  * build output) that gets bundled into every export. Must be built first
- * via `pnpm --filter @scorm-quiz/runtime build`. */
-const RUNTIME_DIST_DIR = process.env["RUNTIME_DIST_DIR"] ?? path.resolve(process.cwd(), "../runtime/dist");
+ * via `pnpm --filter @scorm-quiz/runtime build`. Resolved relative to this
+ * module's own location (not process.cwd(), which varies by how the API is
+ * launched) so it works whether run from the repo root or apps/api. */
+const RUNTIME_DIST_DIR = process.env["RUNTIME_DIST_DIR"] ?? path.resolve(moduleDir, "../../runtime/dist");
 
 async function collectFiles(dir: string, baseDir = dir): Promise<PackageFile[]> {
   const entries = await readdir(dir);

@@ -1,6 +1,7 @@
 export * from "./seededRandom.js";
 export * from "./generateOrder.js";
 export * from "./sessionLogic.js";
+export * from "./runtimeState.js";
 export * from "./components/SingleSelectView.js";
 export * from "./components/MultipleSelectView.js";
 export * from "./components/TrueFalseView.js";

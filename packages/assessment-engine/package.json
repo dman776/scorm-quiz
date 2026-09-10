@@ -20,7 +20,8 @@
   },
   "dependencies": {
     "@scorm-quiz/schemas": "workspace:*",
-    "@scorm-quiz/scoring-engine": "workspace:*"
+    "@scorm-quiz/scoring-engine": "workspace:*",
+    "zod": "^3.23.8"
   },
   "peerDependencies": {
     "react": "^18.3.0"
