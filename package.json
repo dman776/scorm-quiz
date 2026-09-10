@@ -9,7 +9,7 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "test": "turbo run test",
+    "test": "turbo run test --filter=!tests-e2e",
     "test:e2e": "pnpm --filter tests-e2e test",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
