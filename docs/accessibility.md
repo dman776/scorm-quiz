@@ -3,6 +3,9 @@
 ## Learner runtime
 - Each question is a fieldset+legend; choices are native radio/checkbox in labels;
   pills are the SAME native inputs styled as pills (correct role/state announced).
+- Hotspot regions are real <button> elements in the tab order with visible focus
+  and aria-pressed, named neutrally ("Region N of M") so the accessible name never
+  gives away the answer. The type stays inherently visual -- see known-limitations.
 - Full keyboard operation; sequence uses Move Up/Down buttons as the accessible
   alternative to drag-and-drop; matching uses native selects.
 - Visible focus (:focus-visible / :focus-within), never removed.

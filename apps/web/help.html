@@ -178,7 +178,22 @@
         <tr><td>Sequence / ordering</td><td>Put items in the correct order.</td></tr>
         <tr><td>Numeric</td><td>Enter a number; correct within an exact value or tolerance.</td></tr>
         <tr><td>Short answer</td><td>Type text matched against accepted answers.</td></tr>
+        <tr><td>Hotspot (click the image)</td><td>Click one or more regions on a picture, diagram or screenshot.</td></tr>
       </table>
+
+      <h4>Building a hotspot question</h4>
+      <ol>
+        <li>Add a <strong>Hotspot</strong> question, then <strong>Upload image</strong>. Keep it under 5MB &mdash;
+          the image is embedded in the SCORM package so it works with no internet connection.</li>
+        <li>Fill in <strong>Image alt text</strong> describing the picture for screen reader users.</li>
+        <li><strong>Drag a box</strong> on the image for each clickable region.</li>
+        <li>Mark which region(s) are <strong>Correct</strong>, and give each a label. Labels are for you and the
+          answer key &mdash; learners never see them, so a label can safely name the answer.</li>
+        <li>Tick <strong>Allow the learner to select more than one region</strong> if several must be found. You then
+          get the usual all-or-nothing, partial credit and weighted scoring choices.</li>
+      </ol>
+      <p>Regions are stored as fractions of the image, so they stay put when the image scales on smaller screens.
+        Hotspot questions cannot be created from Excel, because a spreadsheet cannot carry the image.</p>
 
       <h3 id="editor">The question editor</h3>
       <p>Selecting a question in the list opens it in the center panel. Common fields for every type:</p>

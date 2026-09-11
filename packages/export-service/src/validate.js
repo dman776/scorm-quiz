@@ -1,6 +1,6 @@
 // @ts-check
 /** Assessment validation. Returns blocking errors and non-blocking warnings. */
-import { QUESTION_KINDS } from '../../engine/src/types.js';
+import { QUESTION_KINDS, MAX_HOTSPOT_IMAGE_BYTES, dataUriBytes } from '../../engine/src/types.js';
 import { maxQuestionScore } from '../../engine/src/scoring.js';
 
 export function validateAssessment(a) {
@@ -17,7 +17,7 @@ export function validateAssessment(a) {
     if (ids.has(q.id)) push(errors, 'DUP_ID', `Duplicate question id: ${q.id}`, q.id);
     ids.add(q.id);
     const choiceKinds = [QUESTION_KINDS.SINGLE_SELECT, QUESTION_KINDS.MULTIPLE_SELECT,
-      QUESTION_KINDS.TRUE_FALSE, QUESTION_KINDS.SINGLE_CHECKBOX];
+      QUESTION_KINDS.TRUE_FALSE, QUESTION_KINDS.SINGLE_CHECKBOX, QUESTION_KINDS.HOTSPOT];
     if (choiceKinds.includes(q.kind)) {
       if (!Array.isArray(q.options) || q.options.length === 0)
         push(errors, 'NO_OPTIONS', `Question ${q.id} has no answer options.`, q.id);
@@ -25,6 +25,26 @@ export function validateAssessment(a) {
         push(errors, 'NO_CORRECT', `Question ${q.id} has no correct answer or scores.`, q.id);
       if (Array.isArray(q.options) && q.options.length > 8)
         push(warnings, 'MANY_OPTIONS', `Question ${q.id} has more than 8 options.`, q.id);
+    }
+    if (q.kind === QUESTION_KINDS.HOTSPOT) {
+      const src = q.image && q.image.src;
+      if (!src) push(errors, 'NO_HOTSPOT_IMAGE', `Hotspot question ${q.id} has no image.`, q.id);
+      else if (!/^data:image\//i.test(src))
+        push(errors, 'BAD_HOTSPOT_IMAGE', `Hotspot question ${q.id} image must be an embedded data URI so the package stays self-contained.`, q.id);
+      else if (dataUriBytes(src) > MAX_HOTSPOT_IMAGE_BYTES)
+        push(warnings, 'LARGE_HOTSPOT_IMAGE', `Hotspot question ${q.id} embeds an image over ${MAX_HOTSPOT_IMAGE_BYTES / 1024 / 1024}MB, which inflates the package.`, q.id);
+      if (q.image && !q.image.alt)
+        push(warnings, 'NO_HOTSPOT_ALT', `Hotspot question ${q.id} image has no alt text.`, q.id);
+      for (const o of q.options || []) {
+        const r = o.rect;
+        const inRange = (n) => typeof n === 'number' && n >= 0 && n <= 1;
+        if (!r || !inRange(r.x) || !inRange(r.y) || !inRange(r.w) || !inRange(r.h) || r.w <= 0 || r.h <= 0)
+          push(errors, 'BAD_HOTSPOT_RECT', `Hotspot ${o.id} in question ${q.id} has an invalid region.`, q.id);
+        else if (r.x + r.w > 1.001 || r.y + r.h > 1.001)
+          push(errors, 'BAD_HOTSPOT_RECT', `Hotspot ${o.id} in question ${q.id} extends past the image.`, q.id);
+      }
+      if (!q.multiple && (q.options || []).filter((o) => o.correct).length > 1)
+        push(warnings, 'HOTSPOT_MULTI_CORRECT', `Question ${q.id} allows only one pick but marks several hotspots correct.`, q.id);
     }
     if (q.kind === QUESTION_KINDS.MATCHING && (!q.pairs || q.pairs.length === 0))
       push(errors, 'NO_PAIRS', `Matching question ${q.id} has no pairs.`, q.id);

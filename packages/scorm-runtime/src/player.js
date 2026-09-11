@@ -197,6 +197,29 @@ export class AssessmentPlayer {
         wrap.append(input);
         break;
       }
+      case QUESTION_KINDS.HOTSPOT: {
+        wrap.classList.add('sqb-hotspot-wrap');
+        const cur = q.multiple ? (Array.isArray(val) ? val : []) : val == null ? [] : [val];
+        const figure = h('div', { class: 'sqb-hotspot-figure' });
+        figure.append(h('img', { class: 'sqb-hotspot-img', src: q.image.src, alt: q.image.alt || '' }));
+        const pct = (n) => `${(n * 100).toFixed(4)}%`;
+        const opts = q.options || [];
+        opts.forEach((o, i) => {
+          const selected = cur.includes(o.id);
+          figure.append(h('button', {
+            type: 'button', class: 'sqb-hotspot' + (selected ? ' sqb-hotspot-on' : ''),
+            style: `left:${pct(o.rect.x)};top:${pct(o.rect.y)};width:${pct(o.rect.w)};height:${pct(o.rect.h)}`,
+            'aria-pressed': selected ? 'true' : 'false',
+            // Neutral name on purpose: the author's label names the answer.
+            'aria-label': `Region ${i + 1} of ${opts.length}`,
+            onclick: () => this._pickHotspot(q, o.id),
+          }));
+        });
+        wrap.append(figure);
+        wrap.append(h('p', { class: 'sqb-hotspot-hint' },
+          q.multiple ? 'Select every region that applies.' : 'Select one region on the image.'));
+        break;
+      }
     }
     return wrap;
   }
@@ -207,6 +230,19 @@ export class AssessmentPlayer {
     [cur[i], cur[j]] = [cur[j], cur[i]];
     this._answer(q.id, cur.slice());
     this._renderQuestion();
+  }
+  _pickHotspot(q, optionId) {
+    if (!q.multiple) {
+      this._answer(q.id, this.state.answers[q.id] === optionId ? null : optionId);
+    } else {
+      const set = new Set(Array.isArray(this.state.answers[q.id]) ? this.state.answers[q.id] : []);
+      if (set.has(optionId)) set.delete(optionId); else set.add(optionId);
+      this._answer(q.id, [...set]);
+    }
+    this._renderQuestion();
+    const i = (q.options || []).findIndex((o) => o.id === optionId);
+    const btn = this.root.querySelectorAll('.sqb-hotspot')[i];
+    if (btn) /** @type {HTMLElement} */ (btn).focus();
   }
   _answer(id, value) { this.state.answers[id] = value; this._persist(); }
   _toggleFlag(id) {

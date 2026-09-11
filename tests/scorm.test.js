@@ -73,3 +73,12 @@ test('adapter standalone with no API', () => {
   assert.equal(adapter.initialize(), false);
   assert.equal(adapter.setValue('cmi.location', '1'), false);
 });
+
+test('hotspot reports as a choice interaction', () => {
+  const q = { id: 'q', kind: QUESTION_KINDS.HOTSPOT, multiple: true,
+    options: [{ id: 'h1', correct: true }, { id: 'h2', correct: true }, { id: 'h3' }] };
+  const p = buildResponsePatterns(q, ['h1', 'h3']);
+  assert.equal(p.type, 'choice');
+  assert.equal(p.learner, 'h1[,]h3');
+  assert.equal(p.correct, 'h1[,]h2');
+});

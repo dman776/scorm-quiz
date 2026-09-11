@@ -90,3 +90,37 @@ test('maxQuestionScore reflects weighted correct options', () => {
     options: [{ id: 'a', correct: true, score: 1.5 }, { id: 'b', correct: true, score: 1.5 }, { id: 'c', score: -1 }] };
   assert.equal(maxQuestionScore(q), 3);
 });
+
+test('hotspot single pick scores like single_select', () => {
+  const q = { id: 'q', kind: QUESTION_KINDS.HOTSPOT, points: 3, multiple: false,
+    image: { src: 'data:image/png;base64,AAA', alt: 'map' },
+    options: [{ id: 'h1', correct: true, rect: { x: 0, y: 0, w: .5, h: .5 } },
+      { id: 'h2', rect: { x: .5, y: .5, w: .5, h: .5 } }] };
+  assert.equal(scoreQuestion(q, 'h1').score, 3);
+  assert.equal(scoreQuestion(q, 'h1').outcome, 'correct');
+  assert.equal(scoreQuestion(q, 'h2').outcome, 'incorrect');
+  assert.equal(scoreQuestion(q, null).outcome, 'unanswered');
+});
+
+test('hotspot multi pick honours all_or_nothing and partial', () => {
+  const base = { id: 'q', kind: QUESTION_KINDS.HOTSPOT, points: 4, multiple: true,
+    image: { src: 'data:image/png;base64,AAA' },
+    options: [{ id: 'h1', correct: true, rect: { x: 0, y: 0, w: .3, h: .3 } },
+      { id: 'h2', correct: true, rect: { x: .3, y: 0, w: .3, h: .3 } },
+      { id: 'h3', rect: { x: .6, y: 0, w: .3, h: .3 } }] };
+  const strict = { ...base, scoringStrategy: SCORING_STRATEGY.ALL_OR_NOTHING };
+  assert.equal(scoreQuestion(strict, ['h1', 'h2']).score, 4);
+  assert.equal(scoreQuestion(strict, ['h1']).score, 0);
+  const partial = { ...base, scoringStrategy: SCORING_STRATEGY.PARTIAL };
+  assert.equal(scoreQuestion(partial, ['h1']).score, 2);
+  assert.equal(scoreQuestion(partial, ['h1']).outcome, 'partial');
+  assert.equal(scoreQuestion(partial, ['h1', 'h2', 'h3']).score, 2);
+  assert.equal(scoreQuestion(partial, []).outcome, 'unanswered');
+});
+
+test('hotspot maxQuestionScore sums per-region scores only when multi', () => {
+  const opts = [{ id: 'h1', correct: true, score: 2, rect: { x: 0, y: 0, w: .3, h: .3 } },
+    { id: 'h2', correct: true, score: 3, rect: { x: .3, y: 0, w: .3, h: .3 } }];
+  assert.equal(maxQuestionScore({ id: 'q', kind: QUESTION_KINDS.HOTSPOT, points: 1, multiple: true, options: opts }), 5);
+  assert.equal(maxQuestionScore({ id: 'q', kind: QUESTION_KINDS.HOTSPOT, points: 1, multiple: false, options: opts }), 3);
+});

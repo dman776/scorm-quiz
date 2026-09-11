@@ -4,7 +4,7 @@
  * Pure functions, no I/O, no randomness. Shared by the authoring preview,
  * the packaged SCO runtime, and the unit tests so scores can never diverge.
  */
-import { QUESTION_KINDS, SCORING_STRATEGY } from './types.js';
+import { QUESTION_KINDS, SCORING_STRATEGY, choiceKindOf } from './types.js';
 
 /**
  * @typedef {Object} QuestionResult
@@ -28,7 +28,7 @@ function clampQuestionScore(raw, max, allowNegative) {
 /** Max points a single question can yield (respects per-answer scores). */
 export function maxQuestionScore(q) {
   if (Array.isArray(q.options) && q.options.some((o) => typeof o.score === 'number')) {
-    if (q.kind === QUESTION_KINDS.MULTIPLE_SELECT) {
+    if (choiceKindOf(q) === QUESTION_KINDS.MULTIPLE_SELECT) {
       return round2(
         q.options
           .filter((o) => o.correct && (o.score ?? 0) > 0)
@@ -55,7 +55,7 @@ export function scoreQuestion(q, response) {
     outcome: /** @type {const} */ ('unanswered'), answered: false,
   });
 
-  switch (q.kind) {
+  switch (choiceKindOf(q)) {
     case QUESTION_KINDS.SINGLE_SELECT:
     case QUESTION_KINDS.TRUE_FALSE:
     case QUESTION_KINDS.SINGLE_CHECKBOX: {

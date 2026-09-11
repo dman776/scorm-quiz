@@ -26,6 +26,8 @@ SetValue is logged but never aborts submission (proven by a fault-injection test
 choice -> ids joined by `[,]`; true-false -> true/false; matching ->
 `src[.]tgt[,]...`; sequencing -> ordered ids by `[,]`; numeric -> `min[:]max`
 range; fill-in -> text. Ids sanitized to `[A-Za-z0-9_.-]`, latency ISO 8601.
+Hotspot questions report as `choice` using their region ids: SCORM 2004 has no
+hotspot interaction type, and the learner is choosing among identified regions.
 
 ## Packaging
 ZIP with `imsmanifest.xml` at the ROOT (no wrapper folder): index.html, runtime

@@ -15,6 +15,7 @@ export const QUESTION_KINDS = Object.freeze({
   SEQUENCE: 'sequence',
   NUMERIC: 'numeric',
   SHORT_ANSWER: 'short_answer',
+  HOTSPOT: 'hotspot',
 });
 
 /** Presentation styles for choice questions. */
@@ -36,7 +37,17 @@ export const SCORM_INTERACTION_TYPE = Object.freeze({
   sequence: 'sequencing',
   numeric: 'numeric',
   short_answer: 'fill-in',
+  hotspot: 'choice',
 });
+
+/**
+ * Hotspot questions reuse the choice machinery: each hotspot is an option with
+ * a normalized rect. Resolves one to the choice kind whose rules it follows.
+ */
+export function choiceKindOf(q) {
+  if (q.kind !== QUESTION_KINDS.HOTSPOT) return q.kind;
+  return q.multiple ? QUESTION_KINDS.MULTIPLE_SELECT : QUESTION_KINDS.SINGLE_SELECT;
+}
 
 /** Scoring strategies. */
 export const SCORING_STRATEGY = Object.freeze({
@@ -75,5 +86,17 @@ export const PROJECT_SCHEMA_VERSION = 1;
 
 /** Conservative SCORM 2004 suspend_data limit (chars) used for warnings. */
 export const SUSPEND_DATA_LIMIT = 64000;
+
+/** Per-image cap for embedded hotspot images, in raw (decoded) bytes. Not a SCORM limit. */
+export const MAX_HOTSPOT_IMAGE_BYTES = 5 * 1024 * 1024;
+
+/** Decoded byte size of a base64 data URI, without decoding it. */
+export function dataUriBytes(uri) {
+  const comma = uri.indexOf(',');
+  if (comma < 0 || !/;base64$/i.test(uri.slice(0, comma))) return uri.length;
+  const b64 = uri.slice(comma + 1);
+  const pad = b64.endsWith('==') ? 2 : b64.endsWith('=') ? 1 : 0;
+  return Math.floor((b64.length * 3) / 4) - pad;
+}
 
 export const _typesOnly = true;

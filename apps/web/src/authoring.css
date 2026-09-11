@@ -39,6 +39,18 @@ body { margin: 0; font-family: var(--font); color: var(--ink); background: var(-
   border: 1px solid var(--border); border-radius: 8px; padding: 8px; background: #fbfcfe; }
 .foot-label { width: 100%; font-size: .72rem; font-weight: 700; text-transform: uppercase; color: var(--muted); }
 .attribution { margin: 0; font-size: .72rem; color: var(--muted); text-align: center; }
+.hs-canvas { position: relative; display: inline-block; max-width: 100%; line-height: 0;
+  border: 1px solid var(--border); border-radius: 8px; overflow: hidden; cursor: crosshair;
+  touch-action: none; user-select: none; }
+.hs-img { max-width: 100%; height: auto; display: block; pointer-events: none; }
+.hs-rect { position: absolute; border: 2px dashed var(--primary); background: rgba(11, 92, 173, .12);
+  pointer-events: none; }
+.hs-rect.hs-correct { border-style: solid; border-color: var(--ok); background: rgba(26, 127, 55, .18); }
+.hs-rect.hs-ghost { border-style: solid; background: rgba(11, 92, 173, .22); }
+.hs-rect-num { position: absolute; top: 0; left: 0; padding: 0 4px; font-size: .7rem; line-height: 1.4;
+  background: var(--primary); color: #fff; }
+.hs-badge { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px;
+  border-radius: 50%; background: var(--primary); color: #fff; font-size: .75rem; flex: none; }
 .field { margin-bottom: 14px; }
 .field label { display: block; font-weight: 600; font-size: .85rem; margin-bottom: 4px; }
 /* Scope full-width rule to DIRECT children so it does not leak into .opt-row inputs. */

@@ -32,6 +32,20 @@ body.sqb-body { margin: 0; background: var(--sqb-bg); color: var(--sqb-ink);
   border: 1px solid var(--sqb-border); border-radius: var(--sqb-radius); }
 .sqb-text { width: 100%; }
 .sqb-units { margin-left: 8px; color: var(--sqb-muted); }
+/* Shrink to the image: hotspot percentages resolve against this box, so if it
+   stretched to the flex container the regions would drift off the picture. */
+.sqb-hotspot-wrap { align-items: flex-start; }
+.sqb-hotspot-figure { position: relative; display: inline-block; max-width: 100%; line-height: 0; }
+.sqb-hotspot-img { max-width: 100%; height: auto; display: block; }
+.sqb-hotspot { position: absolute; margin: 0; padding: 0; cursor: pointer; line-height: 1.2;
+  background: rgba(11, 92, 173, .08); border: 2px dashed var(--sqb-primary); border-radius: 4px; }
+.sqb-hotspot:hover { background: rgba(11, 92, 173, .18); }
+.sqb-hotspot:focus-visible { outline: 3px solid var(--sqb-focus); outline-offset: 2px; }
+/* Selection is marked by fill, solid border AND a check glyph, never colour alone. */
+.sqb-hotspot-on { background: rgba(26, 127, 55, .28); border: 3px solid var(--sqb-correct); }
+.sqb-hotspot-on::after { content: "\2713"; position: absolute; top: 2px; right: 4px;
+  color: var(--sqb-correct); font-weight: 700; font-size: 1rem; }
+.sqb-hotspot-hint { color: var(--sqb-muted); font-size: .9rem; margin: 10px 0 0; }
 .sqb-seq { list-style: decimal; padding-left: 28px; }
 .sqb-seq-item { display: flex; justify-content: space-between; align-items: center; gap: 10px;
   border: 1px solid var(--sqb-border); border-radius: var(--sqb-radius); padding: 8px 12px; margin: 6px 0; }

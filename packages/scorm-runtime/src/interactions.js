@@ -2,7 +2,7 @@
 /**
  * SCORM 2004 4th Edition interaction formatting (IEEE 1484.11.1 data bindings).
  */
-import { SCORM_INTERACTION_TYPE, QUESTION_KINDS } from '../../engine/src/types.js';
+import { SCORM_INTERACTION_TYPE, QUESTION_KINDS, choiceKindOf } from '../../engine/src/types.js';
 
 export function safeInteractionId(id) {
   return String(id).replace(/[^A-Za-z0-9_.-]/g, '_').slice(0, 250);
@@ -28,7 +28,7 @@ export function buildResponsePatterns(q, response) {
   const type = SCORM_INTERACTION_TYPE[q.kind] || 'other';
   const asArr = (v) => (Array.isArray(v) ? v : v == null || v === '' ? [] : [v]);
 
-  switch (q.kind) {
+  switch (choiceKindOf(q)) {
     case QUESTION_KINDS.SINGLE_SELECT:
     case QUESTION_KINDS.MULTIPLE_SELECT: {
       const learner = asArr(response).map(safeInteractionId).join('[,]');

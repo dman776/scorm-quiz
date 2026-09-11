@@ -282,6 +282,14 @@ function buildQuestion(row, idx) {
       q.caseSensitive = YES(pick(row, idx, 'casesensitive'));
       break;
     }
+    case 'hotspot': {
+      // Regions are drawn on an uploaded image, which a spreadsheet cannot carry.
+      // Keep the kind so validation says "needs an image" instead of "no options".
+      q.image = { src: '', alt: '' };
+      q.options = [];
+      q.multiple = YES(pick(row, idx, 'multiple', 'multiselect'));
+      break;
+    }
     default:
       q.kind = 'single_select';
       q.presentation = 'radio';

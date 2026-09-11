@@ -6,6 +6,7 @@
  */
 import { validateAssessment } from '../../../packages/export-service/src/validate.js';
 import { AssessmentPlayer } from '../../../packages/scorm-runtime/src/player.js';
+import { MAX_HOTSPOT_IMAGE_BYTES } from '../../../packages/engine/src/types.js';
 
 const API = location.origin.startsWith('http') ? `${location.protocol}//${location.hostname}:4000` : 'http://localhost:4000';
 const ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -23,6 +24,7 @@ const KIND_PRESET = {
   sequence: { kind: 'sequence', scoringStrategy: 'all_or_nothing' },
   numeric: { kind: 'numeric' },
   short_answer: { kind: 'short_answer' },
+  hotspot: { kind: 'hotspot', multiple: false, scoringStrategy: 'all_or_nothing' },
 };
 
 let model = load() || blankQuiz();
@@ -69,6 +71,7 @@ function newQuestion(presetKey) {
   else if (base.kind === 'sequence') { base.items = [{ id: 's1', label: 'First' }, { id: 's2', label: 'Second' }, { id: 's3', label: 'Third' }]; base.correctOrder = ['s1', 's2', 's3']; }
   else if (base.kind === 'numeric') { base.exact = 0; base.tolerance = 0; base.units = ''; }
   else if (base.kind === 'short_answer') { base.accepted = ['answer']; base.caseSensitive = false; }
+  else if (base.kind === 'hotspot') { base.image = { src: '', alt: '' }; base.options = []; }
   return base;
 }
 
@@ -115,7 +118,8 @@ function renderEditor() {
   else if (q.kind === 'sequence') c.append(sequenceEditor(q));
   else if (q.kind === 'numeric') c.append(numericEditor(q));
   else if (q.kind === 'short_answer') c.append(shortAnswerEditor(q));
-  if (q.kind === 'multiple_select')
+  else if (q.kind === 'hotspot') c.append(hotspotEditor(q));
+  if (q.kind === 'multiple_select' || (q.kind === 'hotspot' && q.multiple))
     c.append(field('Scoring strategy', selectInput(q.scoringStrategy || 'all_or_nothing',
       [['all_or_nothing', 'All or nothing'], ['partial', 'Partial credit'], ['weighted', 'Weighted (per-answer scores)']],
       (v) => { q.scoringStrategy = v; touch(); })));
@@ -174,6 +178,119 @@ function shortAnswerEditor(q) {
   wrap.append(el('label', { class: 'inline' }, el('input', { type: 'checkbox', checked: !!q.caseSensitive, onchange: (e) => { q.caseSensitive = e.target.checked; touch(); } }), ' Case sensitive'));
   return wrap;
 }
+
+function hotspotEditor(q) {
+  const wrap = el('div', { class: 'field' }, el('label', {}, 'Hotspot image and regions'));
+  const picker = el('input', { type: 'file', accept: 'image/png,image/jpeg,image/gif,image/webp,image/svg+xml', class: 'sr-only',
+    onchange: (e) => { const f = e.target.files[0]; if (f) loadHotspotImage(q, f); e.target.value = ''; } });
+  wrap.append(el('div', { class: 'opt-row' },
+    el('button', { class: 'btn', onclick: () => picker.click() }, q.image.src ? 'Replace image' : 'Upload image'),
+    picker));
+
+  if (!q.image.src) {
+    wrap.append(el('p', { class: 'hint' }, 'Upload an image, then drag on it to draw each clickable region.'));
+    return wrap;
+  }
+
+  wrap.append(field('Image alt text', textInput(q.image.alt, (v) => { q.image.alt = v; touch(); }),
+    'Describe the image for learners using a screen reader.'));
+
+  const canvas = el('div', { class: 'hs-canvas' });
+  const img = el('img', { class: 'hs-img', src: q.image.src, alt: q.image.alt || '', draggable: 'false' });
+  canvas.append(img);
+  const pct = (n) => `${(n * 100).toFixed(4)}%`;
+  q.options.forEach((o, i) => {
+    canvas.append(el('div', { class: 'hs-rect' + (o.correct ? ' hs-correct' : ''),
+      style: `left:${pct(o.rect.x)};top:${pct(o.rect.y)};width:${pct(o.rect.w)};height:${pct(o.rect.h)}` },
+      el('span', { class: 'hs-rect-num' }, String(i + 1))));
+  });
+  attachHotspotDraw(q, canvas);
+  wrap.append(canvas);
+  wrap.append(el('p', { class: 'hint' }, 'Drag on the image to add a region. Regions are stored as fractions of the image, so they scale with it.'));
+
+  q.options.forEach((o, i) => {
+    wrap.append(el('div', { class: 'opt-row' },
+      el('span', { class: 'hs-badge' }, String(i + 1)),
+      el('label', { class: 'inline' },
+        el('input', { type: q.multiple ? 'checkbox' : 'radio', name: 'hs-correct-' + q.id, checked: !!o.correct,
+          onchange: (e) => { if (!q.multiple) q.options.forEach((x) => (x.correct = false)); o.correct = e.target.checked; touch(); renderEditor(); } }),
+        ' Correct'),
+      el('input', { type: 'text', class: 'opt-label', value: o.label, placeholder: 'Region label (read to screen readers)',
+        'aria-label': 'Region label', oninput: (e) => { o.label = e.target.value; touch(); } }),
+      el('input', { type: 'number', class: 'w-score', value: o.score ?? '', placeholder: 'score', 'aria-label': 'Region score',
+        oninput: (e) => { o.score = e.target.value === '' ? undefined : parseFloat(e.target.value); touch(); } }),
+      el('button', { class: 'del', 'aria-label': `Remove region ${i + 1}`,
+        onclick: () => { q.options = q.options.filter((x) => x !== o); touch(); renderEditor(); } }, '×')));
+  });
+  if (!q.options.length) wrap.append(el('p', { class: 'hint' }, 'No regions yet. Drag on the image above to add one.'));
+
+  wrap.append(el('label', { class: 'inline' },
+    el('input', { type: 'checkbox', checked: !!q.multiple,
+      onchange: (e) => {
+        q.multiple = e.target.checked;
+        if (!q.multiple) { let seen = false; for (const o of q.options) { if (o.correct && seen) o.correct = false; else if (o.correct) seen = true; } }
+        touch(); renderEditor();
+      } }),
+    ' Allow the learner to select more than one region'));
+  return wrap;
+}
+
+function loadHotspotImage(q, file) {
+  if (file.size > MAX_HOTSPOT_IMAGE_BYTES) {
+    alert(`That image is ${(file.size / 1024 / 1024).toFixed(1)}MB. Images are embedded in the SCORM package, so keep them under ${MAX_HOTSPOT_IMAGE_BYTES / 1024 / 1024}MB.`);
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    q.image.src = String(reader.result);
+    const probe = new Image();
+    probe.onload = () => { q.image.width = probe.naturalWidth; q.image.height = probe.naturalHeight; touch(); };
+    probe.src = q.image.src;
+    touch(); renderEditor();
+  };
+  reader.onerror = () => alert('Could not read that image file.');
+  reader.readAsDataURL(file);
+}
+
+/** Drag a box on the image to create a normalized hotspot rect. */
+function attachHotspotDraw(q, canvas) {
+  let start = null;
+  let ghost = null;
+  const at = (e) => {
+    const b = canvas.getBoundingClientRect();
+    return { x: clamp01((e.clientX - b.left) / b.width), y: clamp01((e.clientY - b.top) / b.height) };
+  };
+  canvas.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    start = at(e);
+    ghost = el('div', { class: 'hs-rect hs-ghost' });
+    canvas.append(ghost);
+    canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (!start || !ghost) return;
+    const r = rectFrom(start, at(e));
+    Object.assign(ghost.style, { left: `${r.x * 100}%`, top: `${r.y * 100}%`, width: `${r.w * 100}%`, height: `${r.h * 100}%` });
+  });
+  canvas.addEventListener('pointerup', (e) => {
+    if (!start) return;
+    const r = rectFrom(start, at(e));
+    start = null;
+    if (ghost) { ghost.remove(); ghost = null; }
+    if (r.w < 0.01 || r.h < 0.01) return;
+    const n = q.options.length + 1;
+    q.options.push({ id: uid('hs').slice(0, 10), label: `Region ${n}`, correct: !q.options.some((o) => o.correct), rect: r });
+    touch(); renderEditor();
+  });
+}
+function clamp01(n) { return Math.max(0, Math.min(1, n)); }
+function rectFrom(a, b) {
+  return { x: round4(Math.min(a.x, b.x)), y: round4(Math.min(a.y, b.y)),
+    w: round4(Math.abs(a.x - b.x)), h: round4(Math.abs(a.y - b.y)) };
+}
+function round4(n) { return Math.round(n * 1e4) / 1e4; }
+
 function duplicate(q) {
   const copy = JSON.parse(JSON.stringify(q));
   copy.id = uid('q');

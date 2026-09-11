@@ -15,7 +15,7 @@ and runs with **no internet connectivity and no external CDNs**.
 
 | Capability | Command | Status |
 | --- | --- | --- |
-| Deterministic scoring engine (8 types + strategies) | `npm test` | pass |
+| Deterministic scoring engine (9 types + strategies) | `npm test` | pass |
 | SCORM interaction formatting / manifest / adapter | `npm test` | pass |
 | Excel import (parse template into a valid quiz) | `npm test` | 8 xlsx tests pass |
 | Build a real SCORM 2004 4th Ed. ZIP | `npm run build:scorm` | dist/*.zip |
@@ -25,7 +25,7 @@ and runs with **no internet connectivity and no external CDNs**.
 | Zero-build authoring UI (New Quiz + Import Excel) | `npm run dev` | runs |
 | JS strict typecheck | `npm run typecheck` | clean |
 
-Total automated tests: **38 passing** (node built-in runner, no install needed).
+Total automated tests: **44 passing** (node built-in runner, no install needed).
 
 ## Quick start
 
