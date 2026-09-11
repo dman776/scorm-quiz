@@ -1,0 +1,69 @@
+:root {
+  --primary: #0b5cad; --ink: #1a1a1a; --muted: #5a5a5a; --border: #d3d8de;
+  --bg: #f5f7fa; --panel: #ffffff; --focus: #ffbf47; --danger: #b3261e; --ok: #1a7f37;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: var(--font); color: var(--ink); background: var(--bg); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+.app-top { display: flex; align-items: center; justify-content: space-between;
+  background: var(--primary); color: #fff; padding: 10px 18px; }
+.app-top h1 { font-size: 1.1rem; margin: 0; }
+.app-top-actions { display: flex; gap: 10px; align-items: center; }
+.pill { background: rgba(255,255,255,.2); border-radius: 999px; padding: 4px 12px; font-size: .8rem; }
+.btn { font: inherit; padding: 8px 14px; border: 1px solid var(--primary); background: #fff;
+  color: var(--primary); border-radius: 8px; cursor: pointer; text-decoration: none; display: inline-block; }
+.btn:hover { background: #eef4fb; }
+.btn:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.btn-primary { background: #fff; color: var(--primary); font-weight: 600; }
+.btn-link { border-color: transparent; color: var(--primary); text-decoration: underline; padding: 8px 6px; }
+.app-top .btn { background: rgba(255,255,255,.12); color: #fff; border-color: rgba(255,255,255,.6); }
+.app-top .btn-primary { background: #fff; color: var(--primary); }
+.app-body { display: grid; grid-template-columns: 300px 1fr 300px; gap: 0; height: calc(100vh - 56px); }
+.app-left, .app-right { background: var(--panel); border-right: 1px solid var(--border); overflow: auto; padding: 14px; }
+.app-right { border-right: none; border-left: 1px solid var(--border); }
+.app-center { overflow: auto; padding: 20px 24px; }
+.left-head h2 { font-size: .95rem; margin: 4px 0 10px; }
+.add-row { display: flex; gap: 6px; margin-bottom: 12px; }
+.control { font: inherit; padding: 7px 8px; border: 1px solid var(--border); border-radius: 8px; width: 100%; }
+.q-list { list-style: none; padding: 0; margin: 0; }
+.q-item { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px;
+  cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+.q-item.active { border-color: var(--primary); background: #eef4fb; }
+.q-item .q-kind { font-size: .72rem; color: var(--muted); text-transform: uppercase; }
+.q-item .q-prompt { font-size: .85rem; }
+.q-move { display: flex; gap: 4px; }
+.q-move button { border: 1px solid var(--border); background: #fff; border-radius: 6px; cursor: pointer; padding: 2px 7px; }
+.left-foot { margin-top: 16px; display: flex; flex-direction: column; gap: 14px; }
+.foot-group { display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  border: 1px solid var(--border); border-radius: 8px; padding: 8px; background: #fbfcfe; }
+.foot-label { width: 100%; font-size: .72rem; font-weight: 700; text-transform: uppercase; color: var(--muted); }
+.field { margin-bottom: 14px; }
+.field label { display: block; font-weight: 600; font-size: .85rem; margin-bottom: 4px; }
+/* Scope full-width rule to DIRECT children so it does not leak into .opt-row inputs. */
+.field > input[type=text], .field > input[type=number], .field > textarea, .field > select {
+  width: 100%; font: inherit; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; }
+.field > textarea { min-height: 60px; resize: vertical; }
+.field .hint { color: var(--muted); font-size: .78rem; margin-top: 3px; }
+.opt-row { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+.opt-row input[type=text], .opt-row input[type=number] {
+  font: inherit; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; }
+.opt-row .opt-label { flex: 1 1 auto; min-width: 0; width: auto; }
+.opt-row .w-score { flex: 0 0 90px; width: 90px; }
+.opt-row input[type=radio], .opt-row input[type=checkbox] { flex: 0 0 auto; }
+.opt-row .del { flex: 0 0 auto; color: var(--danger); border: none; background: none; cursor: pointer; font-size: 1.1rem; }
+.editor-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.editor-head h2 { margin: 0; font-size: 1.05rem; }
+.badge { font-size: .72rem; background: #eef; color: var(--primary); border-radius: 6px; padding: 3px 8px; }
+.issue { border-left: 4px solid var(--muted); padding: 6px 10px; margin-bottom: 8px; font-size: .82rem; background: #fafbfc; }
+.issue.error { border-left-color: var(--danger); }
+.issue.warn { border-left-color: #b58100; }
+.issues-head { font-size: .95rem; margin: 4px 0 10px; }
+.empty { color: var(--muted); font-style: italic; padding: 30px 10px; text-align: center; }
+.preview-dialog { width: min(880px, 94vw); height: 86vh; border: none; border-radius: 12px; padding: 0; }
+.preview-dialog::backdrop { background: rgba(0,0,0,.5); }
+.preview-head { display: flex; justify-content: space-between; align-items: center;
+  background: var(--primary); color: #fff; padding: 10px 16px; }
+.preview-dialog .sqb-app { height: calc(86vh - 44px); overflow: auto; }
+.row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.inline { display: flex; align-items: center; gap: 8px; }

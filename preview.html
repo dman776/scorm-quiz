@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SCORM Quiz Builder - Learner Preview</title>
+  <link rel="stylesheet" href="packages/scorm-runtime/src/player.css" />
+  <style>
+    body { margin:0; }
+    .sqb-toolbar { background:#0b5cad; color:#fff; padding:10px 16px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+    .sqb-toolbar h1 { font-size:1rem; margin:0; }
+    .sqb-toolbar label { font-size:.85rem; }
+  </style>
+</head>
+<body class="sqb-body">
+  <div class="sqb-toolbar">
+    <h1>SCORM Quiz Builder</h1><span>Learner Preview</span>
+    <label><input type="checkbox" id="debug" /> Show SCORM debug panel (mock LMS)</label>
+    <button id="reload" class="sqb-btn" style="background:#fff">Restart attempt</button>
+  </div>
+  <div class="sqb-app"><main id="sqb-main" tabindex="-1"></main></div>
+  <script type="module">
+    import { AssessmentPlayer } from './packages/scorm-runtime/src/player.js';
+    import { installMockLMS } from './packages/mock-lms/mock-lms.js';
+    const params = new URLSearchParams(location.search);
+    async function boot() {
+      document.getElementById('sqb-main').innerHTML = '';
+      const assessment = await (await fetch('./examples/demo-assessment.json')).json();
+      const debug = document.getElementById('debug').checked || params.get('debug') === '1';
+      let logger;
+      if (debug) {
+        if (!window.API_1484_11) installMockLMS(window);
+        let panel = document.getElementById('dbg');
+        if (!panel) { panel = document.createElement('pre'); panel.id = 'dbg'; panel.setAttribute('aria-hidden','true');
+          panel.style.cssText = 'position:fixed;bottom:0;right:0;max-height:45vh;width:440px;overflow:auto;background:#111;color:#3f6;font:11px monospace;padding:8px;z-index:9999;margin:0;';
+          document.body.append(panel); }
+        panel.textContent = '';
+        logger = (e) => { panel.textContent += `${e.fn}(${(e.args||[]).map(x=>String(x).slice(0,40)).join(', ')}) => ${e.result ?? ''}${e.error ? ' ERR:'+e.error : ''}\n`; panel.scrollTop = panel.scrollHeight; };
+      } else { window.API_1484_11 = undefined; }
+      new AssessmentPlayer({ root: document.getElementById('sqb-main'), assessment, logger, preview: !debug }).start();
+    }
+    document.getElementById('reload').addEventListener('click', () => { if (window.API_1484_11) window.API_1484_11 = undefined; boot(); });
+    document.getElementById('debug').addEventListener('change', boot);
+    boot();
+  </script>
+</body>
+</html>

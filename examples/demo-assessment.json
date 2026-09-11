@@ -1,0 +1,192 @@
+{
+  "schemaVersion": 1,
+  "id": "ascend-itnet-foundations-quiz",
+  "title": "ASCEND IT & Networking Foundations Knowledge Check",
+  "lmsTitle": "ASCEND IT & Networking Foundations Knowledge Check",
+  "description": "Demonstration assessment exercising every supported question type and SCORM 2004 4th Edition interaction reporting.",
+  "version": "1.0",
+  "author": "SCORM Quiz Builder",
+  "language": "en-US",
+  "settings": {
+    "passingPercent": 80,
+    "maxAttempts": 2,
+    "scoreRetention": "highest",
+    "allowBackward": true,
+    "requireAnswer": false,
+    "shuffleQuestions": true,
+    "shuffleAnswers": true,
+    "seed": 20260910,
+    "passMessage": "Congratulations. You have demonstrated foundational IT and networking knowledge.",
+    "failMessage": "You did not reach 80%. Review the foundational modules and try again.",
+    "results": {
+      "showScore": true,
+      "showPassFail": true,
+      "showCorrectCount": true,
+      "showCorrectAnswers": true,
+      "delayUntilFinalAttempt": true,
+      "showMissedOnly": false
+    }
+  },
+  "questions": [
+    {
+      "id": "q1-topology",
+      "kind": "single_select",
+      "presentation": "radio",
+      "section": "Topologies",
+      "objective": "Identify network topologies",
+      "prompt": "In a star topology, how are devices connected?",
+      "points": 2,
+      "options": [
+        { "id": "a", "label": "Each device connects to a central switch or hub", "correct": true, "feedback": "Correct. The central node is the single point of connection." },
+        { "id": "b", "label": "Each device connects to two neighbors in a closed loop", "feedback": "That describes a ring topology." },
+        { "id": "c", "label": "All devices share a single backbone cable", "feedback": "That describes a bus topology." },
+        { "id": "d", "label": "Every device connects directly to every other device", "feedback": "That describes a full mesh." }
+      ],
+      "correctFeedback": "Nice work identifying the star topology.",
+      "incorrectFeedback": "Review the topology comparison module.",
+      "rationale": "A star topology centralizes connectivity through one switch or hub, simplifying troubleshooting."
+    },
+    {
+      "id": "q2-media",
+      "kind": "single_select",
+      "presentation": "single_pill",
+      "section": "Media",
+      "objective": "Select transmission media",
+      "prompt": "Which medium is least susceptible to electromagnetic interference?",
+      "points": 2,
+      "shuffleOptions": true,
+      "options": [
+        { "id": "utp", "label": "Unshielded twisted pair" },
+        { "id": "coax", "label": "Coaxial cable" },
+        { "id": "fiber", "label": "Fiber optic", "correct": true },
+        { "id": "power", "label": "Powerline" }
+      ],
+      "correctFeedback": "Yes. Fiber uses light, so it is immune to EMI.",
+      "incorrectFeedback": "Copper media are affected by EMI; fiber is not.",
+      "rationale": "Fiber transmits light rather than electrical signals, eliminating EMI concerns."
+    },
+    {
+      "id": "q3-osi",
+      "kind": "multiple_select",
+      "presentation": "checkbox",
+      "section": "OSI Model",
+      "objective": "Classify OSI layers",
+      "prompt": "Select ALL layers that belong to the OSI model. (Partial credit applies.)",
+      "points": 4,
+      "scoringStrategy": "partial",
+      "incorrectPenalty": 1,
+      "options": [
+        { "id": "phys", "label": "Physical", "correct": true },
+        { "id": "trans", "label": "Transport", "correct": true },
+        { "id": "app", "label": "Application", "correct": true },
+        { "id": "cloud", "label": "Cloud" },
+        { "id": "virtual", "label": "Virtualization" }
+      ],
+      "correctFeedback": "All three OSI layers identified.",
+      "partialFeedback": "You identified some OSI layers. Cloud and Virtualization are not OSI layers.",
+      "incorrectFeedback": "Revisit the seven OSI layers.",
+      "rationale": "Physical, Transport, and Application are OSI layers; Cloud and Virtualization are not."
+    },
+    {
+      "id": "q4-secure-ports",
+      "kind": "multiple_select",
+      "presentation": "multi_pill",
+      "section": "Security",
+      "objective": "Recognize secure protocols",
+      "prompt": "Select the protocols that provide encryption. (Weighted scoring.)",
+      "points": 3,
+      "scoringStrategy": "weighted",
+      "allowNegative": false,
+      "options": [
+        { "id": "https", "label": "HTTPS", "correct": true, "score": 1.5 },
+        { "id": "ssh", "label": "SSH", "correct": true, "score": 1.5 },
+        { "id": "http", "label": "HTTP", "score": -1, "feedback": "HTTP is unencrypted." },
+        { "id": "telnet", "label": "Telnet", "score": -1, "feedback": "Telnet is unencrypted." }
+      ],
+      "correctFeedback": "Both encrypted protocols selected.",
+      "partialFeedback": "At least one encrypted protocol identified.",
+      "incorrectFeedback": "HTTPS and SSH are the encrypted options.",
+      "rationale": "HTTPS and SSH encrypt traffic; HTTP and Telnet send data in clear text."
+    },
+    {
+      "id": "q5-poe",
+      "kind": "true_false",
+      "section": "Power",
+      "objective": "Explain PoE",
+      "prompt": "Power over Ethernet (PoE) can deliver both data and electrical power over a single cable.",
+      "points": 1,
+      "options": [
+        { "id": "true", "label": "True", "correct": true },
+        { "id": "false", "label": "False" }
+      ],
+      "correctFeedback": "Correct. PoE carries data and power together.",
+      "incorrectFeedback": "PoE does carry both data and power.",
+      "rationale": "PoE injects DC power onto the same twisted pair used for data."
+    },
+    {
+      "id": "q6-match-ports",
+      "kind": "matching",
+      "section": "Protocols",
+      "objective": "Map protocols to ports",
+      "prompt": "Match each protocol to its default port. (Partial credit applies.)",
+      "points": 4,
+      "scoringStrategy": "partial",
+      "pairs": [
+        { "prompt": "HTTPS", "match": "443" },
+        { "prompt": "SSH", "match": "22" },
+        { "prompt": "DNS", "match": "53" },
+        { "prompt": "HTTP", "match": "80" }
+      ],
+      "correctFeedback": "All ports matched correctly.",
+      "partialFeedback": "Some ports matched. Review the common port list.",
+      "incorrectFeedback": "Review well-known port numbers.",
+      "rationale": "HTTPS 443, SSH 22, DNS 53, HTTP 80 are the well-known defaults."
+    },
+    {
+      "id": "q7-seq-osi",
+      "kind": "sequence",
+      "section": "OSI Model",
+      "objective": "Order OSI layers",
+      "prompt": "Arrange these OSI layers from Layer 1 (bottom) to Layer 4. (Exact order required.)",
+      "points": 3,
+      "scoringStrategy": "all_or_nothing",
+      "items": [
+        { "id": "l1", "label": "Physical" },
+        { "id": "l2", "label": "Data Link" },
+        { "id": "l3", "label": "Network" },
+        { "id": "l4", "label": "Transport" }
+      ],
+      "correctOrder": ["l1", "l2", "l3", "l4"],
+      "correctFeedback": "Perfect ordering.",
+      "incorrectFeedback": "The order is Physical, Data Link, Network, Transport.",
+      "rationale": "OSI layers 1 to 4 are Physical, Data Link, Network, Transport."
+    },
+    {
+      "id": "q8-subnet",
+      "kind": "numeric",
+      "section": "Addressing",
+      "objective": "Compute host counts",
+      "prompt": "How many usable host addresses are in a /24 IPv4 subnet?",
+      "points": 2,
+      "exact": 254,
+      "tolerance": 0,
+      "units": "hosts",
+      "correctFeedback": "Correct. 256 minus network and broadcast equals 254.",
+      "incorrectFeedback": "A /24 has 256 addresses, 254 usable.",
+      "rationale": "2^8 = 256 total addresses, minus the network and broadcast addresses."
+    },
+    {
+      "id": "q9-shortanswer",
+      "kind": "short_answer",
+      "section": "Addressing",
+      "objective": "Recall address translation",
+      "prompt": "What three-letter acronym describes translating private IP addresses to a public IP address?",
+      "points": 1,
+      "accepted": ["NAT", "Network Address Translation"],
+      "caseSensitive": false,
+      "correctFeedback": "Correct. NAT translates private to public addressing.",
+      "incorrectFeedback": "The answer is NAT (Network Address Translation).",
+      "rationale": "NAT allows many private hosts to share one or more public addresses."
+    }
+  ]
+}

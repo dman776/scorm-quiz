@@ -1,12 +1,76 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SCORM Quiz Builder</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SCORM Quiz Builder - Authoring</title>
+  <link rel="stylesheet" href="src/authoring.css" />
+</head>
+<body>
+  <header class="app-top">
+    <h1>SCORM Quiz Builder</h1>
+    <div class="app-top-actions">
+      <span id="save-state" class="pill" aria-live="polite">Saved</span>
+      <button id="btn-new" class="btn">New Quiz</button>
+      <button id="btn-validate" class="btn">Validate</button>
+      <button id="btn-preview" class="btn">Preview</button>
+      <button id="btn-export" class="btn btn-primary">Export SCORM</button>
+      <a id="btn-help" class="btn btn-help" href="help.html" target="_blank" rel="noopener" title="Open the help &amp; user guide (opens in a new tab)">Help</a>
+    </div>
+  </header>
+  <div class="app-body">
+    <nav class="app-left" aria-label="Assessment structure">
+      <div class="left-head">
+        <h2>Questions</h2>
+        <div class="add-row">
+          <label class="sr-only" for="add-kind">Question type</label>
+          <select id="add-kind" class="control">
+            <option value="single_select">Single select (radio)</option>
+            <option value="single_select_pill">Single select (pills)</option>
+            <option value="multiple_select">Multiple select (checkbox)</option>
+            <option value="multiple_select_pill">Multiple select (pills)</option>
+            <option value="true_false">True / False</option>
+            <option value="single_checkbox">Single checkbox</option>
+            <option value="matching">Matching</option>
+            <option value="sequence">Sequence / ordering</option>
+            <option value="numeric">Numeric</option>
+            <option value="short_answer">Short answer</option>
+          </select>
+          <button id="btn-add" class="btn btn-primary">Add</button>
+        </div>
+      </div>
+      <ol id="q-list" class="q-list" aria-label="Question list"></ol>
+      <div class="left-foot">
+        <button id="btn-settings" class="btn">Assessment settings</button>
+        <div class="foot-group">
+          <span class="foot-label">Excel</span>
+          <button id="btn-import-xlsx" class="btn">Import Excel</button>
+          <a id="btn-template" class="btn btn-link" href="../../examples/template.xlsx" download>Download template</a>
+          <input id="xlsx-input" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="sr-only" />
+        </div>
+        <div class="foot-group">
+          <span class="foot-label">Project (JSON)</span>
+          <button id="btn-load" class="btn">Import project</button>
+          <button id="btn-save-file" class="btn">Export project</button>
+          <input id="file-input" type="file" accept="application/json" class="sr-only" />
+        </div>
+        <div class="foot-group">
+          <span class="foot-label">Help</span>
+          <a class="btn btn-link" href="help.html" target="_blank" rel="noopener">Open the user guide</a>
+        </div>
+      </div>
+    </nav>
+    <main class="app-center" id="editor" aria-live="polite"></main>
+    <aside class="app-right" id="issues" aria-label="Validation issues"></aside>
+  </div>
+  <dialog id="preview-dialog" class="preview-dialog" aria-label="Learner preview">
+    <div class="preview-head">
+      <strong>Learner preview</strong>
+      <button id="preview-close" class="btn">Close</button>
+    </div>
+    <div class="sqb-app"><main id="preview-root" tabindex="-1"></main></div>
+  </dialog>
+  <link rel="stylesheet" href="../../packages/scorm-runtime/src/player.css" />
+  <script type="module" src="src/authoring.js"></script>
+</body>
 </html>

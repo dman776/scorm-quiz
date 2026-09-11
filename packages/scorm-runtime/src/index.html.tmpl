@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="{{LANG}}">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{TITLE}}</title>
+  <link rel="stylesheet" href="assets/player.css" />
+  <style>:root{ {{THEME_VARS}} }</style>
+</head>
+<body class="sqb-body">
+  <a class="sr-only" href="#sqb-main">Skip to assessment</a>
+  <div class="sqb-app">
+    <header class="sqb-header">
+      <h1>{{TITLE}}</h1>
+    </header>
+    <main id="sqb-main" tabindex="-1"></main>
+  </div>
+  <script type="module">
+    import { AssessmentPlayer } from './runtime/scorm-runtime/src/player.js';
+    import assessment from './runtime/assessment.data.js';
+    const params = new URLSearchParams(location.search);
+    const preview = params.get('preview') === '1';
+    let logger = undefined;
+    if (params.get('debug') === '1') {
+      try {
+        const mod = await import('./runtime/mock-lms.js');
+        if (!window.API_1484_11) mod.installMockLMS(window);
+      } catch (_e) {}
+      const panel = document.createElement('pre');
+      panel.setAttribute('aria-hidden', 'true');
+      panel.style.cssText = 'position:fixed;bottom:0;right:0;max-height:40vh;width:420px;overflow:auto;background:#111;color:#0f0;font:11px monospace;padding:8px;z-index:9999;';
+      document.body.append(panel);
+      logger = (e) => { panel.textContent += `${e.fn}(${(e.args||[]).join(', ').slice(0,80)}) => ${e.result ?? ''}${e.error ? ' ERR:'+e.error : ''}\n`; panel.scrollTop = panel.scrollHeight; };
+    }
+    const player = new AssessmentPlayer({ root: document.getElementById('sqb-main'), assessment, logger, preview });
+    window.addEventListener('beforeunload', () => { try { player.adapter.commit(); } catch (_e) {} });
+    player.start();
+  </script>
+</body>
+</html>
