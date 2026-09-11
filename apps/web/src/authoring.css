@@ -38,6 +38,7 @@ body { margin: 0; font-family: var(--font); color: var(--ink); background: var(-
 .foot-group { display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
   border: 1px solid var(--border); border-radius: 8px; padding: 8px; background: #fbfcfe; }
 .foot-label { width: 100%; font-size: .72rem; font-weight: 700; text-transform: uppercase; color: var(--muted); }
+.attribution { margin: 0; font-size: .72rem; color: var(--muted); text-align: center; }
 .field { margin-bottom: 14px; }
 .field label { display: block; font-weight: 600; font-size: .85rem; margin-bottom: 4px; }
 /* Scope full-width rule to DIRECT children so it does not leak into .opt-row inputs. */
