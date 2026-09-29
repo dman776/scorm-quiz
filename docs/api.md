@@ -1,16 +1,20 @@
 # REST API
 
 Base URL: `http://localhost:4000` (set `PORT` to change). JSON bodies unless noted.
+The same server serves the authoring UI (`/` redirects to `/apps/web/index.html`)
+and the shared packages it imports; nothing else in the repo is served. Saved
+assessments are JSON files in `apps/server/data/` (override with `SQB_DATA_DIR`).
 
 | Method | Path | Purpose | Body | Response |
 | --- | --- | --- | --- | --- |
-| GET | `/api/assessments` | List assessments | - | `{ assessments: [...] }` |
+| GET | `/api/version` | App version (root package.json) | - | `{ version }` |
+| GET | `/api/assessments` | List assessments, newest first | - | `{ assessments: [...] }` |
 | POST | `/api/assessments` | Create | partial assessment | `201` assessment |
 | GET | `/api/assessments/:id` | Fetch | - | assessment |
 | PUT | `/api/assessments/:id` | Update/upsert | assessment fields | updated assessment |
 | DELETE | `/api/assessments/:id` | Delete | - | `{ deleted }` |
-| POST | `/api/assessments/:id/validate` | Validate | assessment (or stored) | `{ errors, warnings }` |
-| POST | `/api/assessments/:id/export` | Build SCORM ZIP | assessment (or stored) | `application/zip` or `422` |
+| POST | `/api/assessments/:id/validate` | Validate | assessment (else the stored one) | `{ errors, warnings }` |
+| POST | `/api/assessments/:id/export` | Build SCORM ZIP | assessment (else the stored one) | `application/zip` or `422` |
 | GET | `/api/assessments/:id/answer-key` | Answer key (text) | - | `text/plain` |
 | GET | `/api/assessments/:id/questions.csv` | Question report | - | `text/csv` |
 | POST | `/api/import` | Import project JSON | project file | `201` created |

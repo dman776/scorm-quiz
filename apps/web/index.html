@@ -11,7 +11,8 @@
     <h1>SCORM Quiz Builder</h1>
     <div class="app-top-actions">
       <span id="save-state" class="pill" aria-live="polite">Saved</span>
-      <button id="btn-new" class="btn">New Quiz</button>
+      <button id="btn-library" class="btn" title="Open, create, import and delete quizzes">Library</button>
+      <button id="btn-save" class="btn" title="Save this quiz to the library (Ctrl/Cmd+S)">Save</button>
       <button id="btn-validate" class="btn">Validate</button>
       <button id="btn-preview" class="btn">Preview</button>
       <button id="btn-export" class="btn btn-primary">Export SCORM</button>
@@ -43,23 +44,7 @@
       <ol id="q-list" class="q-list" aria-label="Question list"></ol>
       <div class="left-foot">
         <button id="btn-settings" class="btn">Assessment settings</button>
-        <div class="foot-group">
-          <span class="foot-label">Excel</span>
-          <button id="btn-import-xlsx" class="btn">Import Excel</button>
-          <a id="btn-template" class="btn btn-link" href="../../examples/template.xlsx" download>Download template</a>
-          <input id="xlsx-input" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="sr-only" />
-        </div>
-        <div class="foot-group">
-          <span class="foot-label">Project (JSON)</span>
-          <button id="btn-load" class="btn">Import project</button>
-          <button id="btn-save-file" class="btn">Export project</button>
-          <input id="file-input" type="file" accept="application/json" class="sr-only" />
-        </div>
-        <div class="foot-group">
-          <span class="foot-label">Help</span>
-          <a class="btn btn-link" href="help.html" target="_blank" rel="noopener">Open the user guide</a>
-        </div>
-        <p class="attribution">Built by Darryl Quinn</p>
+        <p class="attribution">Built by Darryl Quinn<span id="app-version" class="app-version"></span></p>
       </div>
     </nav>
     <main class="app-center" id="editor" aria-live="polite"></main>
@@ -68,9 +53,18 @@
   <dialog id="preview-dialog" class="preview-dialog" aria-label="Learner preview">
     <div class="preview-head">
       <strong>Learner preview</strong>
-      <button id="preview-close" class="btn">Close</button>
+      <span class="preview-head-actions">
+        <label class="preview-toggle"><input type="checkbox" id="preview-lms-toggle" aria-controls="preview-lms" /> Show what the LMS receives</label>
+        <button id="preview-close" class="btn">Close</button>
+      </span>
     </div>
-    <div class="sqb-app"><main id="preview-root" tabindex="-1"></main></div>
+    <div class="preview-body" id="preview-body">
+      <div class="sqb-app"><main id="preview-root" tabindex="-1"></main></div>
+      <section id="preview-lms" class="preview-lms" aria-label="What the LMS receives" hidden>
+        <h3>What the LMS receives</h3>
+        <div id="preview-lms-body"></div>
+      </section>
+    </div>
   </dialog>
   <link rel="stylesheet" href="../../packages/scorm-runtime/src/player.css" />
   <script type="module" src="src/authoring.js"></script>

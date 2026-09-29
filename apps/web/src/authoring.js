@@ -1,14 +1,20 @@
 // @ts-check
 /**
  * Zero-build authoring application. Reuses the shared validate.js and player.js
- * so authoring, preview and export never diverge. SCORM export and Excel import
- * are delegated to the API server (which uses the shared engines).
+ * so authoring, preview and export never diverge. The library, SCORM export and
+ * Excel import are delegated to the server (which uses the shared engines).
+ *
+ * The quiz being edited is kept as a local draft (localStorage) so a reload
+ * never loses work; Save writes it to the server-side library.
  */
 import { validateAssessment } from '../../../packages/export-service/src/validate.js';
 import { AssessmentPlayer } from '../../../packages/scorm-runtime/src/player.js';
 import { MAX_HOTSPOT_IMAGE_BYTES } from '../../../packages/engine/src/types.js';
+import { MockLMS } from '../../../packages/mock-lms/mock-lms.js';
 
-const API = location.origin.startsWith('http') ? `${location.protocol}//${location.hostname}:4000` : 'http://localhost:4000';
+// The server that serves this page also serves the API.
+const API = location.protocol.startsWith('http') ? '' : 'http://localhost:4000';
+const SERVER_DOWN = 'Could not reach the server. Start it with: npm start';
 const ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
 const nanoid = (n = 6) => Array.from({ length: n }, () => ALPHABET[(Math.random() * ALPHABET.length) | 0]).join('');
 const uid = (p) => `${p}-${nanoid(6)}`;
@@ -27,7 +33,10 @@ const KIND_PRESET = {
   hotspot: { kind: 'hotspot', multiple: false, scoringStrategy: 'all_or_nothing' },
 };
 
-let model = load() || blankQuiz();
+const draft = load();
+let model = draft || blankQuiz();
+/** True when the editor holds changes the library does not have. */
+let dirty = draft ? localStorage.getItem('sqb-dirty') === '1' : false;
 let activeId = model.questions[0]?.id || null;
 
 function blankQuiz() {
@@ -43,11 +52,25 @@ function blankQuiz() {
     questions: [],
   };
 }
-function save() { localStorage.setItem('sqb-project', JSON.stringify(model)); setSaveState('Saved'); }
+/** Store the local draft. Failures (private mode, quota) only cost the draft. */
+function save() {
+  try {
+    localStorage.setItem('sqb-project', JSON.stringify(model));
+    localStorage.setItem('sqb-dirty', dirty ? '1' : '0');
+  } catch { /* the library copy is unaffected */ }
+}
 function load() { try { return JSON.parse(localStorage.getItem('sqb-project') || 'null'); } catch { return null; } }
 let saveTimer;
-function touch() { setSaveState('Saving...'); clearTimeout(saveTimer); saveTimer = setTimeout(save, 400); }
-function setSaveState(t) { $('#save-state').textContent = t; }
+function touch() { setDirty(true); clearTimeout(saveTimer); saveTimer = setTimeout(save, 400); }
+function setDirty(d) {
+  dirty = d;
+  const pill = $('#save-state');
+  // updatedAt is stamped by the server, so its absence means never saved.
+  pill.textContent = d ? 'Unsaved changes' : model.updatedAt ? 'Saved to library' : 'Not saved';
+  pill.classList.toggle('dirty', d);
+}
+/** Unsaved work worth warning about before it is replaced. */
+function hasUnsaved() { return dirty && model.questions.length > 0; }
 
 const $ = (s, r = document) => r.querySelector(s);
 function el(tag, attrs = {}, ...kids) {
@@ -100,7 +123,11 @@ function textInput(value, on, type = 'text') { return el('input', { type, value:
 function textArea(value, on) { return el('textarea', { oninput: (e) => on(e.target.value) }, value || ''); }
 function selectInput(value, options, on) { return el('select', { onchange: (e) => on(e.target.value) }, ...options.map(([v, l]) => el('option', { value: v, selected: v === value }, l))); }
 
+/** What the center pane shows: 'question', 'settings' or 'library'. */
+let view = 'question';
+
 function renderEditor() {
+  view = 'question';
   const c = $('#editor');
   c.innerHTML = '';
   const q = model.questions.find((x) => x.id === activeId);
@@ -315,6 +342,8 @@ function renderIssues() {
 
 function openSettings() {
   activeId = null;
+  view = 'settings';
+  renderList();
   const c = $('#editor');
   c.innerHTML = '';
   const s = model.settings;
@@ -339,8 +368,40 @@ function openPreview() {
   const dlg = /** @type {HTMLDialogElement} */ ($('#preview-dialog'));
   const root = $('#preview-root');
   root.innerHTML = '';
-  new AssessmentPlayer({ root, assessment: JSON.parse(JSON.stringify(model)), preview: true }).start();
+  // A fresh in-memory LMS per preview, so the author sees exactly what a real
+  // LMS would be sent, including every cmi.interactions record.
+  const lms = new MockLMS();
+  const refresh = () => renderLmsPanel(lms);
+  new AssessmentPlayer({ root, assessment: JSON.parse(JSON.stringify(model)), preview: true, api: lms,
+    logger: (e) => { if (e.fn === 'SetValue' || e.fn === 'Terminate') refresh(); } }).start();
+  refresh();
+  setLmsPanel(false); // off by default on every preview
   dlg.showModal();
+}
+
+function setLmsPanel(on) {
+  /** @type {HTMLInputElement} */ ($('#preview-lms-toggle')).checked = on;
+  $('#preview-lms').hidden = !on;
+  $('#preview-body').classList.toggle('with-lms', on);
+}
+
+function renderLmsPanel(lms) {
+  const body = $('#preview-lms-body');
+  const v = (k) => lms.data[k] || '';
+  const status = el('dl', { class: 'lms-status' },
+    ...[['completion', 'cmi.completion_status'], ['success', 'cmi.success_status'], ['score.raw', 'cmi.score.raw'],
+      ['score.max', 'cmi.score.max'], ['score.scaled', 'cmi.score.scaled']]
+      .flatMap(([label, k]) => [el('dt', {}, label), el('dd', {}, v(k) || '\u2014')]));
+  const items = lms.interactions.map((it, i) => el('div', { class: 'lms-ix' },
+    el('div', { class: 'lms-ix-head' }, el('span', {}, `${i}. ${it.id} (${it.type})`), el('span', { class: it.result }, it.result || '')),
+    el('div', {}, it.description || ''),
+    el('div', {}, 'Answer: ', el('code', {}, it.learner_response || '(none)')),
+    el('div', {}, 'Correct: ', el('code', {}, it.correct_responses || '')),
+    el('div', { class: 'hint' }, `weighting ${it.weighting || ''} \u00b7 latency ${it.latency || ''}`)));
+  const rejected = lms.errors.map((e) => el('div', { class: 'issue error' }, `Rejected ${e.el} = "${e.val}" (error ${e.code})`));
+  body.replaceChildren(status, el('h4', {}, `cmi.interactions (${lms.interactions.length})`),
+    items.length ? el('div', {}, items) : el('p', { class: 'hint' }, 'Each question is reported as the learner moves past it, and all of them on submit.'),
+    ...rejected);
 }
 
 async function exportScorm() {
@@ -349,9 +410,9 @@ async function exportScorm() {
   try {
     const res = await fetch(`${API}/api/assessments/${encodeURIComponent(model.id)}/export`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(model) });
-    if (!res.ok) { alert('Export failed. Is the API server running on port 4000?'); return; }
+    if (!res.ok) { alert('Export failed. ' + SERVER_DOWN); return; }
     download(await res.blob(), `${model.id}_SCORM2004_4thEd.zip`);
-  } catch (_e) { alert('Export failed. Start the API server: npm run server'); }
+  } catch (_e) { alert('Export failed. ' + SERVER_DOWN); }
 }
 function download(blob, name) {
   const url = URL.createObjectURL(blob);
@@ -366,56 +427,151 @@ function importProject(file) {
     try {
       const data = JSON.parse(String(reader.result));
       if (data.schemaVersion !== 1 || !Array.isArray(data.questions)) throw new Error('bad');
-      model = data; activeId = model.questions[0]?.id || null; touch(); render();
-    } catch { alert('Invalid or unsupported project file.'); }
+    } catch { alert('Invalid or unsupported project file.'); return; }
+    if (hasUnsaved() && !confirm('Import this project? The current quiz has unsaved changes that will be lost.')) return;
+    replaceModel(JSON.parse(String(reader.result)), { isDirty: true });
   };
   reader.readAsText(file);
 }
 
 /* --------------------------- Excel import (new) --------------------------- */
 async function importExcel(file) {
+  if (hasUnsaved() && !confirm('Import this workbook? The current quiz has unsaved changes that will be lost.')) return;
   const bytes = await file.arrayBuffer();
   try {
     const res = await fetch(`${API}/api/import-xlsx`, {
       method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: bytes });
     const data = await res.json().catch(() => null);
     if (!res.ok || !data || !data.assessment) {
-      alert('Excel import failed. ' + ((data && data.error) || 'Is the API server running on port 4000?'));
+      alert('Excel import failed. ' + ((data && data.error) || SERVER_DOWN));
       return;
     }
-    model = data.assessment;
-    activeId = model.questions[0]?.id || null;
-    touch(); render();
+    replaceModel(data.assessment, { isDirty: true });
     const v = data.validation || { errors: [], warnings: [] };
     const n = model.questions.length;
     alert(`Imported ${n} question${n === 1 ? '' : 's'} from Excel.` +
       (v.errors.length ? `\n${v.errors.length} error(s) need attention.` : '') +
       (v.warnings.length ? `\n${v.warnings.length} warning(s).` : ''));
   } catch (_e) {
-    alert('Excel import failed. Start the API server: npm run server');
+    alert('Excel import failed. ' + SERVER_DOWN);
   }
 }
 
-/* -------------------------------- New Quiz (new) -------------------------- */
+/* --------------------------------- Library -------------------------------- */
+async function api(pathname, init) {
+  let res;
+  try { res = await fetch(`${API}${pathname}`, init); } catch { throw new Error(SERVER_DOWN); }
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error((data && data.error) || `Request failed (${res.status})`);
+  return data;
+}
+
+function replaceModel(next, { isDirty }) {
+  model = next;
+  activeId = model.questions[0]?.id || null;
+  setDirty(isDirty); save(); render();
+}
+
+async function saveToLibrary() {
+  try {
+    const saved = await api(`/api/assessments/${encodeURIComponent(model.id)}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(model) });
+    model.updatedAt = saved.updatedAt;
+    setDirty(false); save();
+    if (view === 'library') openLibrary();
+  } catch (err) { alert('Save failed. ' + err.message); }
+}
+
 function newQuiz() {
-  if (model.questions.length && !confirm('Start a new quiz? This clears the current quiz from the editor. Export first if you want to keep it.')) return;
+  if (hasUnsaved() && !confirm('Start a new quiz? The current quiz has unsaved changes that will be lost.')) return;
   model = blankQuiz();
   activeId = null;
-  save(); render(); openSettings();
+  setDirty(true); save(); render(); openSettings();
+}
+
+async function openFromLibrary(id) {
+  if (id !== model.id && hasUnsaved() && !confirm('Open another quiz? The current quiz has unsaved changes that will be lost.')) return;
+  try { replaceModel(await api(`/api/assessments/${encodeURIComponent(id)}`), { isDirty: false }); }
+  catch (err) { alert('Could not open that quiz. ' + err.message); }
+}
+
+async function deleteFromLibrary(item) {
+  if (!confirm(`Delete "${item.title}" from the library? This cannot be undone.`)) return;
+  try {
+    await api(`/api/assessments/${encodeURIComponent(item.id)}`, { method: 'DELETE' });
+    // Still open in the editor, but no longer saved anywhere.
+    if (item.id === model.id) setDirty(true);
+    openLibrary();
+  } catch (err) { alert('Delete failed. ' + err.message); }
+}
+
+async function openLibrary() {
+  view = 'library';
+  activeId = null;
+  renderList();
+  const c = $('#editor');
+  c.innerHTML = '';
+  const listEl = el('div', {}, el('p', { class: 'hint' }, 'Loading...'));
+  const fileBtn = (label, accept, onFile) => {
+    const input = el('input', { type: 'file', accept, class: 'sr-only',
+      onchange: (e) => { if (e.target.files[0]) onFile(e.target.files[0]); e.target.value = ''; } });
+    return [el('button', { class: 'btn', onclick: () => input.click() }, label), input];
+  };
+  c.append(el('div', { class: 'lib' },
+    el('h2', {}, 'Library'),
+    el('p', { class: 'lib-sub' }, 'Open a saved quiz, start a new one, or import from Excel or a project file.'),
+    el('div', { class: 'card' }, el('h3', {}, 'Start'),
+      el('div', { class: 'lib-actions' },
+        el('button', { class: 'btn btn-primary', onclick: newQuiz }, '+ New quiz'),
+        ...fileBtn('Import Excel (.xlsx)', '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', importExcel),
+        ...fileBtn('Import project JSON', 'application/json,.json', importProject),
+        el('button', { class: 'btn', onclick: exportProjectJson }, 'Export project JSON'),
+        el('a', { class: 'btn btn-link', href: '../../examples/template.xlsx', download: '' }, 'Download Excel template'))),
+    el('div', { class: 'card' }, el('h3', {}, 'Saved quizzes'), listEl)));
+
+  let items;
+  try { items = (await api('/api/assessments')).assessments; }
+  catch (err) { listEl.replaceChildren(el('p', { class: 'issue error' }, err.message)); return; }
+  if (view !== 'library') return;
+  if (!items.length) { listEl.replaceChildren(el('p', { class: 'hint' }, 'No saved quizzes yet. Use Save in the top bar to add the current quiz.')); return; }
+  listEl.replaceChildren(el('ul', { class: 'lib-items' }, items.map((it) => {
+    const current = it.id === model.id;
+    const n = it.questionCount;
+    const updated = it.updatedAt ? new Date(it.updatedAt).toLocaleString() : '';
+    return el('li', { class: 'lib-item' + (current ? ' current' : '') },
+      el('div', { class: 'lib-item-main' },
+        el('div', { class: 'lib-name' }, it.title || 'Untitled', current ? el('span', { class: 'badge', style: 'margin-left:8px' }, dirty ? 'Open, unsaved changes' : 'Open') : null),
+        el('div', { class: 'lib-meta' }, [`v${it.version || '1.0'}`, `${n} question${n === 1 ? '' : 's'}`,
+          `pass ${it.passingPercent}%`, updated && `saved ${updated}`].filter(Boolean).join(' \u00b7 '))),
+      el('div', { class: 'lib-item-actions' },
+        el('button', { class: 'btn btn-small', onclick: () => openFromLibrary(it.id) }, 'Open'),
+        el('button', { class: 'btn btn-small btn-danger', 'aria-label': `Delete ${it.title}`, onclick: () => deleteFromLibrary(it) }, 'Delete')));
+  })));
 }
 
 function render() { renderList(); renderEditor(); renderIssues(); }
+async function showVersion() {
+  try { $('#app-version').textContent = 'v' + (await api('/api/version')).version; }
+  catch { /* the credit simply shows no version */ }
+}
 $('#btn-add').addEventListener('click', () => { const q = newQuestion($('#add-kind').value); model.questions.push(q); activeId = q.id; touch(); render(); });
-$('#btn-new').addEventListener('click', newQuiz);
+$('#btn-library').addEventListener('click', openLibrary);
+$('#btn-save').addEventListener('click', saveToLibrary);
+document.addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') { e.preventDefault(); saveToLibrary(); }
+});
 $('#btn-validate').addEventListener('click', renderIssues);
 $('#btn-preview').addEventListener('click', openPreview);
 $('#btn-export').addEventListener('click', exportScorm);
 $('#btn-settings').addEventListener('click', openSettings);
-$('#btn-save-file').addEventListener('click', exportProjectJson);
-$('#btn-load').addEventListener('click', () => $('#file-input').click());
-$('#file-input').addEventListener('change', (e) => { if (e.target.files[0]) importProject(e.target.files[0]); e.target.value = ''; });
-$('#btn-import-xlsx').addEventListener('click', () => $('#xlsx-input').click());
-$('#xlsx-input').addEventListener('change', (e) => { if (e.target.files[0]) importExcel(e.target.files[0]); e.target.value = ''; });
+$('#preview-lms-toggle').addEventListener('change', (e) => setLmsPanel(e.target.checked));
 $('#preview-close').addEventListener('click', () => /** @type {HTMLDialogElement} */ ($('#preview-dialog')).close());
-window.addEventListener('beforeunload', save);
+window.addEventListener('beforeunload', (e) => {
+  save();
+  if (hasUnsaved()) e.preventDefault();
+});
+setDirty(dirty);
 render();
+// First visit, or nothing to edit yet: start in the library.
+if (!draft || (!model.questions.length && !dirty)) openLibrary();
+showVersion();

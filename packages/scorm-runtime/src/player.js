@@ -6,7 +6,7 @@
 import { scoreAssessment, scoreQuestion, maxQuestionScore } from '../../engine/src/scoring.js';
 import { QUESTION_KINDS, PRESENTATION } from '../../engine/src/types.js';
 import { ScormAdapter } from './adapter.js';
-import { buildInteractions } from './interactions.js';
+import { buildInteraction } from './interactions.js';
 import { serializeState, deserializeState, validateStateSize, seededShuffle } from './state.js';
 
 const h = (tag, attrs = {}, ...kids) => {
@@ -29,7 +29,10 @@ export class AssessmentPlayer {
     this.root = cfg.root;
     this.a = cfg.assessment;
     this.settings = this.a.settings || {};
-    this.adapter = new ScormAdapter({ logger: cfg.logger, api: cfg.preview ? null : undefined });
+    // cfg.api injects an LMS (e.g. the authoring preview's in-memory mock);
+    // otherwise preview runs standalone and a real launch discovers the LMS.
+    const api = cfg.api !== undefined ? cfg.api : cfg.preview ? null : undefined;
+    this.adapter = new ScormAdapter({ logger: cfg.logger, api });
     this.startTime = Date.now();
     this.questionStart = Date.now();
     this.latency = {};
@@ -39,6 +42,8 @@ export class AssessmentPlayer {
 
   start() {
     this.adapter.initialize();
+    // Interactions already on the LMS for this attempt; new ones append after.
+    this.lmsInteractionCount = parseInt(this.adapter.getValue('cmi.interactions._count'), 10) || 0;
     this.root.append(this.live);
     this._restoreOrInit();
     if (this.adapter.standalone) this._banner();
@@ -66,7 +71,7 @@ export class AssessmentPlayer {
       }
     }
     this.state = { order: ids, answers: {}, flagged: [], index: 0, submitted: false,
-      attempt: 1, remainingTime: this.settings.timeLimitSec ?? null, answerOrder };
+      attempt: 1, remainingTime: this.settings.timeLimitSec ?? null, answerOrder, interactionIndex: {} };
     this._persist();
   }
 
@@ -252,6 +257,7 @@ export class AssessmentPlayer {
   }
   _go(dir) {
     this._recordLatency();
+    this._journal(this.questions[this.state.index]);
     const q = this.questions[this.state.index];
     if (dir > 0 && this.settings.requireAnswer && this.state.answers[q.id] == null) {
       this._announce('Please answer before continuing.'); return;
@@ -264,8 +270,27 @@ export class AssessmentPlayer {
     if (!q) return;
     this.latency[q.id] = (this.latency[q.id] || 0) + (Date.now() - this.questionStart) / 1000;
   }
+  /** cmi.interactions index for a question, assigned in first-reported order. */
+  _interactionIndex(qid) {
+    const ix = this.state.interactionIndex || (this.state.interactionIndex = {});
+    if (ix[qid] == null) ix[qid] = Math.max(this.lmsInteractionCount || 0, ...Object.values(ix).map((n) => n + 1));
+    return ix[qid];
+  }
+  /**
+   * Report a question as the learner leaves it, so the LMS holds every answer
+   * given even if the attempt is never submitted. Callers persist afterwards.
+   */
+  _journal(q) {
+    if (!q || this.state.submitted) return;
+    const r = scoreQuestion(q, this.state.answers[q.id]);
+    if (!r.answered) return;
+    this.adapter.writeInteraction(this._interactionIndex(q.id),
+      buildInteraction(q, this.state.answers[q.id], r, this.latency[q.id] ?? 0, false));
+  }
   _review() {
     this._recordLatency();
+    this._journal(this.questions[this.state.index]);
+    this._persist();
     this.root.querySelectorAll('.sqb-screen').forEach((n) => n.remove());
     const screen = h('div', { class: 'sqb-screen' });
     screen.append(h('h2', {}, 'Review your answers'));
@@ -296,8 +321,10 @@ export class AssessmentPlayer {
     this.adapter.setValue('cmi.completion_status', 'completed');
     this.adapter.setValue('cmi.success_status', scored.passed ? 'passed' : 'failed');
     this.adapter.setValue('cmi.session_time', isoDuration((Date.now() - this.startTime) / 1000));
-    const interactions = buildInteractions(this.questions, this.state.answers, resultsById, this.latency);
-    this.adapter.writeInteractions(interactions);
+    for (const q of this.questions) {
+      this.adapter.writeInteraction(this._interactionIndex(q.id),
+        buildInteraction(q, this.state.answers[q.id], resultsById[q.id], this.latency[q.id] ?? 0, true));
+    }
     this.adapter.setValue('cmi.exit', 'normal');
     this.state.submitted = true;
     this.state.lastScore = scored;

@@ -1,16 +1,17 @@
 {
   "name": "scorm-quiz-builder",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "type": "module",
   "description": "Author graded tests/quizzes (incl. Excel import) and export self-contained SCORM 2004 4th Edition packages.",
   "workspaces": ["packages/*", "apps/*"],
   "scripts": {
+    "start": "node apps/server/src/server.js",
     "test": "node --test \"tests/*.test.js\"",
     "build:scorm": "node tools/build-scorm.mjs",
     "template": "python tools/make-template.py examples/template.xlsx",
     "e2e:sim": "node tools/e2e-sim.mjs",
-    "dev": "node tools/dev-server.mjs",
+    "dev": "node apps/server/src/server.js",
     "typecheck": "tsc -p tsconfig.check.json",
     "server": "node apps/server/src/server.js"
   },

@@ -37,5 +37,6 @@ adapter.setValue('cmi.exit','normal');
 adapter.commit(); adapter.terminate();
 console.log('\ncompletion:', lms.GetValue('cmi.completion_status'), '| success:', lms.GetValue('cmi.success_status'));
 console.log('score.raw/max:', lms.GetValue('cmi.score.raw'), '/', lms.GetValue('cmi.score.max'), '| scaled:', lms.GetValue('cmi.score.scaled'));
-console.log('interactions:', lms.GetValue('cmi.interactions._count'), '| API calls:', lms.log.length);
+console.log('interactions:', lms.GetValue('cmi.interactions._count'), '| API calls:', lms.log.length, '| rejected:', lms.errors.length);
+for (let i = 0; i < lms.interactions.length; i++) console.log(`  ${i}: ${lms.GetValue(`cmi.interactions.${i}.id`)} -> ${lms.GetValue(`cmi.interactions.${i}.learner_response`)} (${lms.GetValue(`cmi.interactions.${i}.result`)})`);
 console.log('Percent:', scored.percent + '%', '| Passed:', scored.passed);

@@ -6,7 +6,7 @@ export function serializeState(state) {
   const compact = {
     v: 1, o: state.order, a: state.answers, f: state.flagged, i: state.index,
     s: state.submitted ? 1 : 0, at: state.attempt, rt: state.remainingTime ?? null,
-    ao: state.answerOrder ?? null,
+    ao: state.answerOrder ?? null, ix: state.interactionIndex ?? {},
   };
   return JSON.stringify(compact);
 }
@@ -24,6 +24,7 @@ export function deserializeState(str) {
   return {
     order: raw.o || [], answers: raw.a || {}, flagged: raw.f || [], index: raw.i || 0,
     submitted: raw.s === 1, attempt: raw.at || 1, remainingTime: raw.rt, answerOrder: raw.ao,
+    interactionIndex: raw.ix || {},
   };
 }
 

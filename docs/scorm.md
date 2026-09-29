@@ -20,14 +20,37 @@ SetValue is logged but never aborts submission (proven by a fault-injection test
 | cmi.progress_measure | 1 on completion |
 | cmi.session_time | ISO 8601 duration |
 | cmi.location / suspend_data | current index / compact JSON state |
-| cmi.interactions.n.* | one record per reportable question |
+| cmi.interactions.n.* | one record per question (see below) |
 
-## Interaction formats (IEEE 1484.11.1)
-choice -> ids joined by `[,]`; true-false -> true/false; matching ->
-`src[.]tgt[,]...`; sequencing -> ordered ids by `[,]`; numeric -> `min[:]max`
-range; fill-in -> text. Ids sanitized to `[A-Za-z0-9_.-]`, latency ISO 8601.
-Hotspot questions report as `choice` using their region ids: SCORM 2004 has no
-hotspot interaction type, and the learner is choosing among identified regions.
+## Interactions
+Each question gets one `cmi.interactions.n` record: `id` (question id), `type`,
+`objectives.0.id` (the question's objective, if set), `timestamp`, `weighting`
+(max points), `correct_responses.0.pattern`, `learner_response`, `result`,
+`latency` and `description` (the question text, up to 250 chars).
+
+**When they are written.** A question is reported when the learner moves past it
+(Next, Previous, or Review & submit) if it has an answer, with `result` computed then, so the LMS
+holds every answer given even if the attempt is never submitted. On submit every
+question is rewritten with its final result; unanswered questions report
+`incorrect` with no `learner_response`. Indexes are assigned in first-reported
+order, continuing after any `_count` already on the LMS, so they are always
+contiguous. The question-to-index map is kept in `suspend_data` (`ix`), so a
+resumed session updates the same records.
+
+**Formats (IEEE 1484.11.1).** Responses use identifiers derived from the answer
+TEXT so LMS reports are readable: runs of characters outside `[A-Za-z0-9_.-]`
+become `_`, capped at 64 chars, with `_2`, `_3` suffixes for duplicate labels
+(blank labels fall back to the option id). choice -> identifiers joined by `[,]`;
+true-false -> `true`/`false`; matching -> `source[.]target[,]...`; sequencing ->
+ordered identifiers by `[,]`; numeric -> learner value, correct `min[:]max`;
+fill-in -> text. `result` is `correct`/`incorrect` (partial credit reports
+`incorrect`; the score reflects the partial points). A question the learner
+skips is not reported until submit. Latency is ISO 8601. Hotspot questions report
+as `choice` using their region labels: SCORM 2004 has no hotspot interaction type.
+
+The mock LMS validates interaction writes like a strict LMS (contiguous indexes,
+`id` then `type` before responses, vocabularies, pattern syntax) and records
+rejections in `lms.errors`; the authoring Preview shows them.
 
 ## Packaging
 ZIP with `imsmanifest.xml` at the ROOT (no wrapper folder): index.html, runtime

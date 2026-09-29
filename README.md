@@ -21,30 +21,44 @@ and runs with **no internet connectivity and no external CDNs**.
 | Build a real SCORM 2004 4th Ed. ZIP | `npm run build:scorm` | dist/*.zip |
 | Headless full attempt through a mock LMS | `npm run e2e:sim` | 100% + 9 interactions |
 | Generate the Excel template | `npm run template` | examples/template.xlsx |
-| REST API (create/validate/export/import/import-xlsx) | `npm run server` | :4000 |
-| Zero-build authoring UI (New Quiz + Import Excel) | `npm run dev` | runs |
+| Authoring UI + REST API on one port | `npm start` | http://localhost:4000 |
 | JS strict typecheck | `npm run typecheck` | clean |
 
-Total automated tests: **44 passing** (node built-in runner, no install needed).
+Total automated tests: **52 passing** (node built-in runner, no install needed).
 
 ## Quick start
 
 ```bash
-npm test                 # 38/38
+npm start                # authoring UI + API on http://localhost:4000
+
+npm test                 # node:test suites
 npm run template         # (re)generate examples/template.xlsx
 npm run build:scorm      # dist/<id>_SCORM2004_4thEd.zip  (upload to LMS)
 npm run e2e:sim          # full attempt scored + reported through a mock LMS
-
-npm run server           # terminal 1: API on http://localhost:4000
-npm run dev              # terminal 2: static server on http://localhost:5173
-#   open /apps/web/index.html   -> authoring UI (New Quiz, Import Excel, Export)
-#   open /preview.html          -> learner preview + SCORM debug panel
 ```
+
+`npm start` serves the authoring UI at `/` and the learner preview at
+`/preview.html`. Set `PORT` to change the port and `SQB_DATA_DIR` to keep the
+library somewhere other than `apps/server/data/`.
 
 Only runtime deps are `jszip` (packaging + xlsx parsing) and `nanoid` (ids),
 already vendored under `node_modules`.
 
-## New in this version
+## New in 1.2.0
+
+- **Per-question LMS reporting**: every question is written to
+  `cmi.interactions` with the question text, the learner's answer and the
+  correct answer as readable text (not internal option ids), the result,
+  weighting, latency and objective. Questions are reported as the learner moves
+  past them and finalized on submit, so an unfinished attempt still reports.
+- **Library**: Save quizzes to the server, then open, delete, create and import
+  them from one Library screen. Unsaved changes are flagged and confirmed.
+- **One command**: `npm start` runs the UI and the API together.
+- **What the LMS receives**: Preview shows the exact CMI data a real LMS would
+  get, and flags anything a strict LMS would reject.
+- The app version is shown under the author credit.
+
+## Earlier
 
 - **Import Excel**: author a quiz in `template.xlsx` and import it in one click.
   See `docs/excel-import.md` for the format. The importer parses the workbook
@@ -63,9 +77,9 @@ packages/
   export-service/  manifest, validator, ZIP packager, xlsx-import, answer-key/CSV
   mock-lms/        SCORM 2004 API mock (dev/test only)
 apps/
-  server/          REST API (import-xlsx endpoint included)
-  web/             zero-build authoring UI (New Quiz + Import Excel)
-tools/             build-scorm, e2e-sim, dev-server, make-template.py
+  server/          serves the authoring UI + REST API (library, import, export)
+  web/             zero-build authoring UI (Library, editor, preview)
+tools/             build-scorm, e2e-sim, make-template.py
 tests/             node:test suites (scoring, scorm, package, xlsx)
 examples/          demo-assessment.json, template.xlsx
 docs/              architecture, data-model, api, scorm, excel-import, a11y, security, ...

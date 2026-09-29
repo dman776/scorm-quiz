@@ -85,18 +85,25 @@ export class ScormAdapter {
       return { code: String(code), string: this.api.GetErrorString(code), diagnostic: this.api.GetDiagnostic(code) };
     } catch (e) { return { code: '-1', string: 'adapter error', diagnostic: String(e) }; }
   }
+  /**
+   * Write (or overwrite) interaction `n`. The LMS only accepts `n` up to the
+   * current `_count`, so callers must assign indexes contiguously. `id` and
+   * `type` go first: the other elements depend on them.
+   */
+  writeInteraction(n, it) {
+    const base = `cmi.interactions.${n}.`;
+    this.setValue(base + 'id', it.id);
+    this.setValue(base + 'type', it.type);
+    if (it.objective) this.setValue(base + 'objectives.0.id', it.objective);
+    this.setValue(base + 'timestamp', it.timestamp);
+    this.setValue(base + 'weighting', it.weighting);
+    if (it.correct_response !== '') this.setValue(base + 'correct_responses.0.pattern', it.correct_response);
+    if (it.learner_response !== '') this.setValue(base + 'learner_response', it.learner_response);
+    this.setValue(base + 'result', it.result);
+    this.setValue(base + 'latency', it.latency);
+    this.setValue(base + 'description', it.description);
+  }
   writeInteractions(interactions) {
-    interactions.forEach((it, i) => {
-      const base = `cmi.interactions.${i}.`;
-      this.setValue(base + 'id', it.id);
-      this.setValue(base + 'type', it.type);
-      this.setValue(base + 'timestamp', it.timestamp);
-      this.setValue(base + 'weighting', it.weighting);
-      if (it.correct_response !== '') this.setValue(base + 'correct_responses.0.pattern', it.correct_response);
-      this.setValue(base + 'learner_response', it.learner_response);
-      this.setValue(base + 'result', it.result);
-      this.setValue(base + 'latency', it.latency);
-      this.setValue(base + 'description', it.description);
-    });
+    interactions.forEach((it, i) => this.writeInteraction(i, it));
   }
 }

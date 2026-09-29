@@ -15,7 +15,7 @@ packages/export-service manifest.js, validate.js, package.js (ZIP), xlsx-import.
 packages/mock-lms      API_1484_11 mock (dev/test only)
 apps/server            REST API (create/validate/export/import/import-xlsx)
 apps/web               zero-build authoring UI (New Quiz, Import Excel)
-tools                  build-scorm, e2e-sim, dev-server, make-template.py
+tools                  build-scorm, e2e-sim, make-template.py
 ```
 
 - **engine** has zero dependencies and is imported everywhere; this is what keeps

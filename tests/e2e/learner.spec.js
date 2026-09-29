@@ -1,8 +1,8 @@
 // @ts-check
 /** Playwright E2E (requires @playwright/test + browsers; network install needed).
- *  Start the dev server first: npm run dev (serves preview.html on :5173). */
+ *  Start the server first: npm start (serves preview.html on :4000). */
 import { test, expect } from '@playwright/test';
-const BASE = 'http://localhost:5173';
+const BASE = 'http://localhost:4000';
 test.describe('Learner attempt (standalone preview)', () => {
   test('renders first question and is keyboard operable', async ({ page }) => {
     await page.goto(`${BASE}/preview.html`);

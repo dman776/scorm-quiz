@@ -1,7 +1,8 @@
 // @ts-check
 /**
- * SCORM Quiz Builder API server (zero-dependency Node http + JSON files).
- * Production target: Express + Prisma (see docs/architecture.md).
+ * SCORM Quiz Builder server (zero-dependency Node http + JSON files). Serves
+ * the authoring UI and the JSON API from one port, so `npm start` is all a
+ * user runs. Production target: Express + Prisma (see docs/architecture.md).
  */
 import http from 'node:http';
 import fs from 'node:fs';
@@ -13,7 +14,10 @@ import { buildScormPackage, buildAnswerKey, buildQuestionCsv } from '../../../pa
 import { importXlsx } from '../../../packages/export-service/src/xlsx-import.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.resolve(__dirname, '../data');
+const ROOT = path.resolve(__dirname, '../../..');
+const DATA_DIR = path.resolve(process.env.SQB_DATA_DIR || path.join(__dirname, '../data'));
+/** App version, from the root package.json: the single source of truth. */
+const APP_VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
 fs.mkdirSync(DATA_DIR, { recursive: true });
 const PORT = Number(process.env.PORT || 4000);
 const MAX_BODY = 8 * 1024 * 1024; // 8MB (xlsx uploads)
@@ -21,8 +25,11 @@ const MAX_BODY = 8 * 1024 * 1024; // 8MB (xlsx uploads)
 const store = {
   file: (id) => path.join(DATA_DIR, `${String(id).replace(/[^A-Za-z0-9_-]/g, '')}.json`),
   list() {
-    return fs.readdirSync(DATA_DIR).filter((f) => f.endsWith('.json') && !f.startsWith('_'))
-      .map((f) => JSON.parse(fs.readFileSync(path.join(DATA_DIR, f), 'utf8')));
+    const out = [];
+    for (const f of fs.readdirSync(DATA_DIR).filter((f) => f.endsWith('.json') && !f.startsWith('_'))) {
+      try { out.push(JSON.parse(fs.readFileSync(path.join(DATA_DIR, f), 'utf8'))); } catch (_e) { /* skip corrupt */ }
+    }
+    return out.sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
   },
   get(id) { const f = store.file(id); return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : null; },
   put(a) { fs.writeFileSync(store.file(a.id), JSON.stringify(a, null, 2)); return a; },
@@ -50,6 +57,27 @@ async function readBody(req) {
   if (!raw) return {};
   try { return JSON.parse(raw); } catch (_e) { throw new Error('Invalid JSON'); }
 }
+/**
+ * Static files for the authoring UI. The web app imports the shared packages
+ * by relative path, so those are served too; nothing else in the repo is.
+ */
+const STATIC_PREFIXES = ['/apps/web/', '/packages/', '/examples/'];
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
+  '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png',
+  '.txt': 'text/plain; charset=utf-8',
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
+function serveStatic(res, pathname) {
+  if (pathname === '/') { res.writeHead(302, { Location: '/apps/web/index.html' }); res.end(); return; }
+  const full = path.join(ROOT, pathname);
+  const allowed = pathname === '/preview.html' || STATIC_PREFIXES.some((p) => pathname.startsWith(p));
+  if (!allowed || !full.startsWith(ROOT + path.sep) || !fs.existsSync(full) || fs.statSync(full).isDirectory()) {
+    res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('Not found'); return;
+  }
+  res.writeHead(200, { 'Content-Type': MIME[path.extname(full)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
+  fs.createReadStream(full).pipe(res);
+}
+
 function newAssessment(input = {}) {
   const id = input.id || `assessment-${nanoid(8)}`;
   return {
@@ -79,7 +107,12 @@ const server = http.createServer(async (req, res) => {
   const parts = url.pathname.split('/').filter(Boolean);
 
   try {
-    if (parts[0] !== 'api') { json(res, 404, { error: 'Not found' }); return; }
+    if (parts[0] !== 'api') {
+      if (req.method !== 'GET' && req.method !== 'HEAD') { json(res, 405, { error: 'Method not allowed' }); return; }
+      serveStatic(res, decodeURIComponent(url.pathname)); return;
+    }
+
+    if (parts[1] === 'version' && req.method === 'GET') return json(res, 200, { version: APP_VERSION });
 
     // POST /api/import-xlsx  -> parse an uploaded .xlsx into an assessment
     if (parts[1] === 'import-xlsx' && req.method === 'POST') {
@@ -118,8 +151,12 @@ const server = http.createServer(async (req, res) => {
         }
         if (req.method === 'DELETE') { const ok = store.del(id); return json(res, ok ? 200 : 404, { deleted: ok }); }
       }
+      // validate/export use the posted editor copy when there is one, so
+      // unsaved edits are what gets checked and packaged.
       if (action === 'validate' && req.method === 'POST') {
-        const a = existing || await readBody(req);
+        const body = await readBody(req);
+        const a = Array.isArray(body.questions) ? body : existing;
+        if (!a) return json(res, 404, { error: 'Not found' });
         return json(res, 200, validateAssessment(a));
       }
       if (action === 'answer-key' && req.method === 'GET' && existing) {
@@ -131,7 +168,8 @@ const server = http.createServer(async (req, res) => {
         return res.end(buildQuestionCsv(existing));
       }
       if (action === 'export' && req.method === 'POST') {
-        const a = existing || (await readBody(req));
+        const body = await readBody(req);
+        const a = Array.isArray(body.questions) ? body : existing;
         if (!a) return json(res, 404, { error: 'Not found' });
         try {
           const { zip, files } = await buildScormPackage({ assessment: a });
@@ -156,5 +194,5 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => console.log(`SCORM Quiz Builder API: http://localhost:${PORT}/api/assessments`));
+server.listen(PORT, () => console.log(`SCORM Quiz Builder v${APP_VERSION}: http://localhost:${PORT}/`));
 export { server, store, newAssessment };

@@ -39,6 +39,26 @@ body { margin: 0; font-family: var(--font); color: var(--ink); background: var(-
   border: 1px solid var(--border); border-radius: 8px; padding: 8px; background: #fbfcfe; }
 .foot-label { width: 100%; font-size: .72rem; font-weight: 700; text-transform: uppercase; color: var(--muted); }
 .attribution { margin: 0; font-size: .72rem; color: var(--muted); text-align: center; }
+.app-version { display: block; margin-top: 2px; font-size: .68rem; opacity: .85; }
+.pill.dirty::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 6px;
+  border-radius: 50%; background: var(--focus); vertical-align: 1px; }
+/* Library */
+.lib { max-width: 860px; }
+.lib-sub { color: var(--muted); margin: -4px 0 16px; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; }
+.card h3 { font-size: .95rem; margin: 0 0 10px; }
+.lib-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.lib-items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.lib-item { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+.lib-item.current { border-color: var(--primary); background: #eef4fb; }
+.lib-item-main { min-width: 0; }
+.lib-name { font-weight: 600; overflow-wrap: anywhere; }
+.lib-meta { color: var(--muted); font-size: .8rem; margin-top: 2px; }
+.lib-item-actions { display: flex; gap: 6px; flex: none; }
+.btn-small { padding: 5px 10px; font-size: .85rem; }
+.btn-danger { border-color: var(--danger); color: var(--danger); }
+.btn-danger:hover { background: #fdf0ef; }
 .hs-canvas { position: relative; display: inline-block; max-width: 100%; line-height: 0;
   border: 1px solid var(--border); border-radius: 8px; overflow: hidden; cursor: crosshair;
   touch-action: none; user-select: none; }
@@ -77,6 +97,23 @@ body { margin: 0; font-family: var(--font); color: var(--ink); background: var(-
 .preview-dialog::backdrop { background: rgba(0,0,0,.5); }
 .preview-head { display: flex; justify-content: space-between; align-items: center;
   background: var(--primary); color: #fff; padding: 10px 16px; }
-.preview-dialog .sqb-app { height: calc(86vh - 44px); overflow: auto; }
+.preview-dialog { width: min(1180px, 96vw); }
+.preview-head-actions { display: flex; align-items: center; gap: 14px; }
+.preview-toggle { font-size: .85rem; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.preview-toggle input { accent-color: #fff; width: 15px; height: 15px; margin: 0; }
+.preview-toggle input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.preview-body { display: grid; grid-template-columns: minmax(0, 1fr); height: calc(86vh - 44px); }
+.preview-body.with-lms { grid-template-columns: minmax(0, 1fr) 380px; }
+.preview-dialog .sqb-app { overflow: auto; min-width: 0; }
+.preview-lms { border-left: 1px solid var(--border); background: var(--bg); overflow: auto; padding: 10px 12px; font-size: .8rem; }
+.preview-lms h3 { font-size: .85rem; margin: 0 0 8px; }
+.lms-status { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 0 0 10px; }
+.lms-status dt { color: var(--muted); }
+.lms-status dd { margin: 0; font-family: ui-monospace, Menlo, monospace; overflow-wrap: anywhere; }
+.lms-ix { border: 1px solid var(--border); border-radius: 6px; background: var(--panel); padding: 6px 8px; margin-bottom: 6px; }
+.lms-ix-head { display: flex; justify-content: space-between; gap: 8px; font-weight: 600; }
+.lms-ix code { font-size: .75rem; overflow-wrap: anywhere; }
+.lms-ix .correct { color: var(--ok); } .lms-ix .incorrect { color: var(--danger); } .lms-ix .neutral { color: var(--muted); }
+@media (max-width: 900px) { .preview-body.with-lms { grid-template-columns: 1fr; } .preview-lms { border-left: none; border-top: 1px solid var(--border); } }
 .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .inline { display: flex; align-items: center; gap: 8px; }

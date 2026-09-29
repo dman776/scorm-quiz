@@ -72,7 +72,7 @@
       <a href="#layout">The screen layout</a>
       <a href="#quickstart">Quick start</a>
       <h2>Top menu</h2>
-      <a href="#new-quiz">New Quiz</a>
+      <a href="#library">Library &amp; Save</a>
       <a href="#validate">Validate</a>
       <a href="#preview">Preview</a>
       <a href="#export">Export SCORM</a>
@@ -106,7 +106,8 @@
         <ul class="tight">
           <li>Launches in the browser and talks to the LMS through the SCORM runtime.</li>
           <li>Reports completion separately from pass/fail, plus raw, min, max, and scaled scores.</li>
-          <li>Reports per-question interaction data for detailed reporting.</li>
+          <li>Reports every question to the LMS (<code>cmi.interactions</code>): the question text, the learner's
+            answer, the correct answer, correct/incorrect, weighting and time spent.</li>
           <li>Saves progress so a learner can leave and resume.</li>
           <li>Enforces your passing score and attempt rules, and works offline (no external content).</li>
         </ul>
@@ -116,30 +117,38 @@
       <p>The builder has four regions:</p>
       <table>
         <tr><th>Region</th><th>What it holds</th></tr>
-        <tr><td><strong>Top bar</strong></td><td>Save status and the main actions: New Quiz, Validate, Preview, Export SCORM.</td></tr>
-        <tr><td><strong>Left panel</strong></td><td>The question list, the "Add question" control, Assessment settings, and the Excel / Project import &amp; export buttons.</td></tr>
-        <tr><td><strong>Center panel</strong></td><td>The editor for the selected question (or the Assessment settings form).</td></tr>
+        <tr><td><strong>Top bar</strong></td><td>Save status and the main actions: Library, Save, Validate, Preview, Export SCORM, Help.</td></tr>
+        <tr><td><strong>Left panel</strong></td><td>The question list, the "Add question" control, and Assessment settings. The version number is under the credit at the bottom.</td></tr>
+        <tr><td><strong>Center panel</strong></td><td>The editor for the selected question, the Assessment settings form, or the Library.</td></tr>
         <tr><td><strong>Right panel</strong></td><td>The live Validation list of errors and warnings.</td></tr>
       </table>
-      <div class="note">Your work saves automatically to your browser. The <strong>Saved</strong> indicator in the top bar
-        turns to <strong>Saving...</strong> briefly whenever you make a change.</div>
+      <div class="note">The indicator in the top bar shows <strong>Unsaved changes</strong> until you click
+        <span class="btn-chip">Save</span>, which stores the quiz in the Library. A working copy is also kept in your
+        browser, so reloading the page never loses edits.</div>
 
       <h2 id="quickstart">Quick start</h2>
       <ol class="steps">
+        <li>Start the builder with <code>npm start</code> and open <code>http://localhost:4000</code>.</li>
+        <li>In the <span class="btn-chip">Library</span>, click <span class="btn-chip">+ New quiz</span> (or import from Excel).</li>
         <li>Click <span class="btn-chip">Assessment settings</span> and set the title and passing score.</li>
         <li>Pick a type from the dropdown and click <span class="btn-chip primary">Add</span>, or use <span class="btn-chip">Import Excel</span>.</li>
         <li>Fill in the prompt, answers, correct choice(s), points, and feedback.</li>
+        <li>Click <span class="btn-chip">Save</span> to keep it in the Library.</li>
         <li>Click <span class="btn-chip">Validate</span> and clear any errors on the right.</li>
         <li>Click <span class="btn-chip">Preview</span> to take the quiz as a learner would.</li>
         <li>Click <span class="btn-chip primary">Export SCORM</span> and upload the ZIP to your LMS.</li>
       </ol>
       <a class="back-top" href="#overview">Back to top</a>
 
-      <h2 id="new-quiz">Top menu: New Quiz</h2>
-      <p><span class="btn-chip">New Quiz</span> clears the editor and starts a fresh, empty quiz. If the current quiz
-        has questions, you are asked to confirm first so you do not lose work by accident.</p>
-      <div class="warn">"New Quiz" replaces what is on screen. If you might need the current quiz later, use
-        <strong>Export project</strong> first (see <a href="#project">Project JSON</a>).</div>
+      <h2 id="library">Top menu: Library &amp; Save</h2>
+      <p><span class="btn-chip">Library</span> lists every saved quiz with its version, question count, passing score
+        and when it was last saved. From there you can <strong>Open</strong> or <strong>Delete</strong> a quiz, start a
+        <strong>+ New quiz</strong>, import from Excel or a project JSON file, export the open quiz as project JSON, and
+        download the Excel template. The quiz you have open is highlighted.</p>
+      <p><span class="btn-chip">Save</span> (or <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>S</kbd>) writes the open quiz to the
+        Library. Imports and new quizzes are not in the Library until you save them.</p>
+      <div class="warn">Opening, importing or starting another quiz replaces what is on screen. If the current quiz has
+        unsaved changes you are asked to confirm first.</div>
 
       <h3 id="validate">Top menu: Validate</h3>
       <p><span class="btn-chip">Validate</span> re-checks the whole quiz and refreshes the Validation panel on the
@@ -147,8 +156,13 @@
 
       <h3 id="preview">Top menu: Preview</h3>
       <p><span class="btn-chip">Preview</span> opens the quiz in a pop-up exactly as a learner will see it: real
-        navigation, scoring, feedback, the review screen, and a pass/fail result. Preview runs in standalone mode,
-        so nothing is recorded to an LMS. Close the pop-up to return to editing.</p>
+        navigation, scoring, feedback, the review screen, and a pass/fail result. Close the pop-up to return to editing.</p>
+      <p>Tick <strong>Show what the LMS receives</strong> in the preview header (off by default) to open a panel beside
+        the quiz that shows exactly what would be sent to your LMS:
+        completion, pass/fail, the scores, and one <code>cmi.interactions</code> record per question with the learner's
+        answer, the correct answer and the result. Anything a strict LMS would reject is listed in red. Nothing leaves
+        your computer; preview uses a simulated LMS. The panel is part of the builder only and is never included in the
+        exported SCORM package, so learners never see it.</p>
       <div class="tip">Preview uses the same engine that runs inside the exported package, so what you see is what
         the learner gets.</div>
 
@@ -157,8 +171,8 @@
         to your LMS. If the quiz has validation errors, the export is blocked and the errors are shown on the right so
         you can fix them first. The ZIP contains everything needed to run offline, with <code>imsmanifest.xml</code> at
         the root.</p>
-      <div class="note">Export needs the local API server running (<code>npm run server</code>, port 4000). If it is not
-        running you will see a reminder.</div>
+      <div class="note">Export needs the builder's server running (<code>npm start</code>). If it is not running you will
+        see a reminder.</div>
       <a class="back-top" href="#overview">Back to top</a>
 
       <h2 id="add">Adding questions</h2>
@@ -263,14 +277,13 @@
       <h2 id="excel">Import from Excel</h2>
       <p>You can author an entire quiz in Excel and load it in one click.</p>
       <ol class="steps">
-        <li>Click <span class="btn-chip">Download template</span> in the Excel area of the left panel.</li>
+        <li>Open the <span class="btn-chip">Library</span> and click <span class="btn-chip">Download Excel template</span>.</li>
         <li>Fill in the <strong>Settings</strong> and <strong>Questions</strong> sheets (the template ships with a
           working example for every question type).</li>
-        <li>Click <span class="btn-chip">Import Excel</span> and choose your file.</li>
+        <li>In the Library, click <span class="btn-chip">Import Excel (.xlsx)</span> and choose your file.</li>
         <li>The quiz loads into the editor and a summary tells you how many questions imported and any issues.</li>
+        <li>Click <span class="btn-chip">Save</span> to add it to the Library.</li>
       </ol>
-      <div class="note">Excel import uses the same API server as export. Start it with <code>npm run server</code> if you
-        have not already.</div>
 
       <h3 id="template">The Excel template format</h3>
       <p>Everything about a question's answers goes in the single <strong>Options</strong> cell, except numeric and
@@ -294,9 +307,9 @@
       </ul>
 
       <h3 id="project">Project JSON (save &amp; reopen)</h3>
-      <p>Use <span class="btn-chip">Export project</span> to save the full editable quiz as a <code>.json</code> file,
-        and <span class="btn-chip">Import project</span> to load one back. This is the best way to keep a backup or move
-        a quiz between machines. (Project JSON keeps everything; the SCORM ZIP is the finished package for the LMS.)</p>
+      <p>In the Library, use <span class="btn-chip">Export project JSON</span> to save the full editable quiz as a
+        <code>.json</code> file, and <span class="btn-chip">Import project JSON</span> to load one back. This is the best
+        way to keep a backup or move a quiz between machines. (Project JSON keeps everything; the SCORM ZIP is the finished package for the LMS.)</p>
       <a class="back-top" href="#overview">Back to top</a>
 
       <h2 id="accessibility">Accessibility</h2>
@@ -314,18 +327,21 @@
       <ul class="tight">
         <li>Completion and pass/fail appear as expected.</li>
         <li>The score matches your chosen retention (highest/latest/first).</li>
-        <li>Per-question interactions are captured.</li>
+        <li>Per-question interactions are captured. Answers are reported as readable text (for example
+          <code>Fiber_optic</code>, or <code>HTTPS[,]SSH</code> for several choices; SCORM does not allow spaces, so they
+          become underscores). Each question is reported when the learner moves past it, and every question is
+          finalized with its result on submit.</li>
         <li>Exit and resume restore the learner's progress.</li>
       </ul>
 
       <h2 id="faq">Troubleshooting</h2>
       <table>
         <tr><th>Symptom</th><th>Fix</th></tr>
-        <tr><td>Export or Excel import does nothing / errors</td><td>Start the API server: <code>npm run server</code> (port 4000).</td></tr>
+        <tr><td>Export or Excel import does nothing / errors</td><td>Start the builder: <code>npm start</code>, then open <code>http://localhost:4000</code>.</td></tr>
         <tr><td>Export is blocked</td><td>Fix the red errors in the Validation panel, then try again.</td></tr>
         <tr><td>Can't type in the answer box</td><td>Type in the wide middle field; the small right-hand box is the optional score.</td></tr>
         <tr><td>Excel import found no questions</td><td>Make sure your sheet is named <strong>Questions</strong> with a header row.</td></tr>
-        <tr><td>Lost my quiz after "New Quiz"</td><td>Use <strong>Import project</strong> to reload a JSON you exported earlier.</td></tr>
+        <tr><td>A quiz is missing from the Library</td><td>It was never saved. Open it and click <strong>Save</strong>, or use <strong>Import project JSON</strong> with a file you exported earlier.</td></tr>
       </table>
 
       <footer>
