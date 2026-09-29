@@ -79,3 +79,48 @@ body.sqb-body { margin: 0; background: var(--sqb-bg); color: var(--sqb-ink);
   overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 @media (max-width: 640px) { .sqb-match-prompt { min-width: 100%; } }
+
+/* ---------------------------- Drag and drop ---------------------------- */
+.sqb-dd { display: flex; flex-direction: column; gap: 14px; }
+.sqb-dd-bank { border: 2px dashed var(--sqb-border); border-radius: var(--sqb-radius); padding: 10px 12px; }
+.sqb-dd-bank-head { font-size: .8rem; font-weight: 700; text-transform: uppercase; color: var(--sqb-muted); margin-bottom: 6px; }
+.sqb-dd-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.sqb-dd-empty { margin: 0; color: var(--sqb-muted); font-size: .9rem; }
+.sqb-dd-return { margin-top: 8px; }
+.sqb-dd-item { font: inherit; min-height: 44px; padding: 8px 14px; border: 2px solid var(--sqb-primary);
+  border-radius: var(--sqb-radius); background: var(--sqb-bg); color: var(--sqb-ink); cursor: grab;
+  touch-action: none; user-select: none; -webkit-user-select: none; text-align: left; }
+.sqb-dd-item:hover { background: #eef4fb; }
+.sqb-dd-item:focus-visible, .sqb-dd-drop:focus-visible { outline: 3px solid var(--sqb-focus); outline-offset: 2px; }
+.sqb-dd-picked { background: var(--sqb-primary); color: var(--sqb-primary-ink); }
+.sqb-dd-picked:hover { background: var(--sqb-primary); }
+/* The original stays as a faint placeholder while its copy (the ghost) moves. */
+.sqb-dd-dragging { opacity: .35; border-style: dashed; }
+.sqb-dd-ghost { position: fixed; z-index: 10000; margin: 0; pointer-events: none; box-sizing: border-box;
+  background: var(--sqb-bg); color: var(--sqb-ink); transform: rotate(-2deg) scale(1.04);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, .28); opacity: .96; }
+.sqb-dd-grabbing, .sqb-dd-grabbing * { cursor: grabbing !important; }
+@media (prefers-reduced-motion: reduce) { .sqb-dd-ghost { transform: none; } }
+.sqb-dd-zones { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.sqb-dd-zone { border: 2px solid var(--sqb-border); border-radius: var(--sqb-radius); padding: 8px; min-height: 110px;
+  display: flex; flex-direction: column; gap: 8px; }
+.sqb-dd-drop { font: inherit; display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+  width: 100%; padding: 6px 8px; border: none; border-radius: 6px; background: #f1f4f8; color: var(--sqb-ink);
+  cursor: pointer; text-align: left; font-weight: 600; }
+.sqb-dd-count { font-weight: 400; font-size: .85rem; color: var(--sqb-muted); white-space: nowrap; }
+.sqb-dd-full .sqb-dd-count { color: var(--sqb-incorrect); }
+/* While an item is picked up or dragged, show every zone is a target. */
+.sqb-dd-picking .sqb-dd-zone, .sqb-dd-active .sqb-dd-zone { border-style: dashed; border-color: var(--sqb-primary); }
+.sqb-dd-active .sqb-dd-bank { border-color: var(--sqb-primary); }
+.sqb-dd-zone.sqb-dd-over, .sqb-dd-bank.sqb-dd-over { border-style: solid; border-color: var(--sqb-primary); background: rgba(11, 92, 173, .10); }
+.sqb-dd-hint { color: var(--sqb-muted); font-size: .9rem; margin: 0; }
+/* Image mode: zones are regions over the picture; items snap inside them. */
+.sqb-dd-figure { position: relative; display: inline-block; max-width: 100%; line-height: 0; align-self: flex-start; }
+.sqb-dd-img { max-width: 100%; height: auto; display: block; }
+.sqb-dd-has-image .sqb-dd-zone { position: absolute; min-height: 0; padding: 0; line-height: 1.2;
+  border: 2px dashed rgba(11, 92, 173, .7); background: rgba(255, 255, 255, .15); }
+.sqb-dd-has-image .sqb-dd-drop { position: absolute; inset: 0; width: auto; padding: 0; background: transparent; }
+.sqb-dd-has-image .sqb-dd-zone .sqb-dd-chips { position: relative; height: 100%; padding: 3px; gap: 3px;
+  align-content: flex-start; pointer-events: none; overflow: visible; }
+.sqb-dd-has-image .sqb-dd-zone .sqb-dd-item { pointer-events: auto; min-height: 32px; padding: 3px 8px; font-size: .85rem; }
+.sqb-review-key { margin: 6px 0 0; padding-left: 20px; font-size: .9rem; }

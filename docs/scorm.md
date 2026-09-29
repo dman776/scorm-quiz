@@ -47,6 +47,11 @@ fill-in -> text. `result` is `correct`/`incorrect` (partial credit reports
 `incorrect`; the score reflects the partial points). A question the learner
 skips is not reported until submit. Latency is ISO 8601. Hotspot questions report
 as `choice` using their region labels: SCORM 2004 has no hotspot interaction type.
+Drag-and-drop questions report as `matching` (`item[.]zone[,]...`, the format
+Articulate Storyline also uses): the learner response lists the items placed and
+where, including any distractor placed; the correct pattern lists each
+non-distractor item with its FIRST accepted zone (the LMS gets one pattern; the
+result is judged by the engine, which accepts any listed zone).
 
 The mock LMS validates interaction writes like a strict LMS (contiguous indexes,
 `id` then `type` before responses, vocabularies, pattern syntax) and records

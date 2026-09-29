@@ -31,6 +31,7 @@ const KIND_PRESET = {
   numeric: { kind: 'numeric' },
   short_answer: { kind: 'short_answer' },
   hotspot: { kind: 'hotspot', multiple: false, scoringStrategy: 'all_or_nothing' },
+  drag_drop: { kind: 'drag_drop', scoringStrategy: 'partial' },
 };
 
 const draft = load();
@@ -102,6 +103,11 @@ function newQuestion(presetKey) {
   else if (base.kind === 'numeric') { base.exact = 0; base.tolerance = 0; base.units = ''; }
   else if (base.kind === 'short_answer') { base.accepted = ['answer']; base.caseSensitive = false; }
   else if (base.kind === 'hotspot') { base.image = { src: '', alt: '' }; base.options = []; }
+  else if (base.kind === 'drag_drop') {
+    base.image = null;
+    base.zones = [{ id: 'z1', label: 'Zone A' }, { id: 'z2', label: 'Zone B' }];
+    base.items = [{ id: 'i1', label: 'Item 1', zones: ['z1'] }, { id: 'i2', label: 'Item 2', zones: ['z2'] }];
+  }
   return base;
 }
 
@@ -141,6 +147,7 @@ function renderEditor() {
   if (!q) { c.append(el('p', { class: 'empty' }, 'Select or add a question to begin editing.')); return; }
   c.append(el('div', { class: 'editor-head' }, el('h2', {}, 'Edit question'),
     el('span', { class: 'inline' }, el('span', { class: 'badge' }, q.kind.replace('_', ' ')),
+      el('button', { class: 'btn', title: 'Try just this question as a learner', onclick: () => openPreview(q) }, 'Preview this question'),
       el('button', { class: 'btn', onclick: () => duplicate(q) }, 'Duplicate'),
       el('button', { class: 'btn', onclick: () => remove(q) }, 'Delete'))));
   c.append(field('Prompt', textArea(q.prompt, (v) => { q.prompt = v; touch(); renderList(); })));
@@ -153,9 +160,14 @@ function renderEditor() {
   else if (q.kind === 'numeric') c.append(numericEditor(q));
   else if (q.kind === 'short_answer') c.append(shortAnswerEditor(q));
   else if (q.kind === 'hotspot') c.append(hotspotEditor(q));
+  else if (q.kind === 'drag_drop') c.append(dragDropEditor(q));
   if (q.kind === 'multiple_select' || (q.kind === 'hotspot' && q.multiple))
     c.append(field('Scoring strategy', selectInput(q.scoringStrategy || 'all_or_nothing',
       [['all_or_nothing', 'All or nothing'], ['partial', 'Partial credit'], ['weighted', 'Weighted (per-answer scores)']],
+      (v) => { q.scoringStrategy = v; touch(); })));
+  if (q.kind === 'drag_drop')
+    c.append(field('Scoring strategy', selectInput(q.scoringStrategy || 'partial',
+      [['partial', 'Partial credit (per item; a placed distractor cancels one)'], ['all_or_nothing', 'All or nothing']],
       (v) => { q.scoringStrategy = v; touch(); })));
   c.append(el('div', { class: 'row-2' },
     field('Correct feedback', textArea(q.correctFeedback, (v) => { q.correctFeedback = v; touch(); })),
@@ -216,7 +228,7 @@ function shortAnswerEditor(q) {
 function hotspotEditor(q) {
   const wrap = el('div', { class: 'field' }, el('label', {}, 'Hotspot image and regions'));
   const picker = el('input', { type: 'file', accept: 'image/png,image/jpeg,image/gif,image/webp,image/svg+xml', class: 'sr-only',
-    onchange: (e) => { const f = e.target.files[0]; if (f) loadHotspotImage(q, f); e.target.value = ''; } });
+    onchange: (e) => { const f = e.target.files[0]; if (f) loadQuestionImage(q, f); e.target.value = ''; } });
   wrap.append(el('div', { class: 'opt-row' },
     el('button', { class: 'btn', onclick: () => picker.click() }, q.image.src ? 'Replace image' : 'Upload image'),
     picker));
@@ -238,7 +250,11 @@ function hotspotEditor(q) {
       style: `left:${pct(o.rect.x)};top:${pct(o.rect.y)};width:${pct(o.rect.w)};height:${pct(o.rect.h)}` },
       el('span', { class: 'hs-rect-num' }, String(i + 1))));
   });
-  attachHotspotDraw(q, canvas);
+  attachRectDraw(canvas, (r) => {
+    const n = q.options.length + 1;
+    q.options.push({ id: uid('hs').slice(0, 10), label: `Region ${n}`, correct: !q.options.some((o) => o.correct), rect: r });
+    touch(); renderEditor();
+  });
   wrap.append(canvas);
   wrap.append(el('p', { class: 'hint' }, 'Drag on the image to add a region. Regions are stored as fractions of the image, so they scale with it.'));
 
@@ -269,14 +285,15 @@ function hotspotEditor(q) {
   return wrap;
 }
 
-function loadHotspotImage(q, file) {
+/** Embed an uploaded image as q.image (hotspot and drag-and-drop backgrounds). */
+function loadQuestionImage(q, file) {
   if (file.size > MAX_HOTSPOT_IMAGE_BYTES) {
     alert(`That image is ${(file.size / 1024 / 1024).toFixed(1)}MB. Images are embedded in the SCORM package, so keep them under ${MAX_HOTSPOT_IMAGE_BYTES / 1024 / 1024}MB.`);
     return;
   }
   const reader = new FileReader();
   reader.onload = () => {
-    q.image.src = String(reader.result);
+    q.image = { alt: '', ...(q.image || {}), src: String(reader.result) };
     const probe = new Image();
     probe.onload = () => { q.image.width = probe.naturalWidth; q.image.height = probe.naturalHeight; touch(); };
     probe.src = q.image.src;
@@ -286,8 +303,8 @@ function loadHotspotImage(q, file) {
   reader.readAsDataURL(file);
 }
 
-/** Drag a box on the image to create a normalized hotspot rect. */
-function attachHotspotDraw(q, canvas) {
+/** Drag a box on the image to create a normalized rect, handed to onRect. */
+function attachRectDraw(canvas, onRect) {
   let start = null;
   let ghost = null;
   const at = (e) => {
@@ -313,11 +330,99 @@ function attachHotspotDraw(q, canvas) {
     start = null;
     if (ghost) { ghost.remove(); ghost = null; }
     if (r.w < 0.01 || r.h < 0.01) return;
-    const n = q.options.length + 1;
-    q.options.push({ id: uid('hs').slice(0, 10), label: `Region ${n}`, correct: !q.options.some((o) => o.correct), rect: r });
-    touch(); renderEditor();
+    onRect(r);
   });
 }
+/**
+ * Drag-and-drop editor: zones (plain boxes, or regions drawn on an optional
+ * background image) and items, each accepting zero or more zones. An item
+ * with no accepted zone is a distractor.
+ */
+function dragDropEditor(q) {
+  q.zones = q.zones || [];
+  q.items = q.items || [];
+  const hasImage = !!(q.image && q.image.src);
+  const wrap = el('div', { class: 'field' });
+  const rerender = () => { touch(); renderEditor(); };
+  const newZoneId = () => { let n = q.zones.length + 1; while (q.zones.some((z) => z.id === `z${n}`)) n++; return `z${n}`; };
+
+  // Background image (optional).
+  const picker = el('input', { type: 'file', accept: 'image/png,image/jpeg,image/gif,image/webp,image/svg+xml', class: 'sr-only',
+    onchange: (e) => { const f = e.target.files[0]; if (f) loadQuestionImage(q, f); e.target.value = ''; } });
+  wrap.append(el('label', {}, 'Background image (optional)'),
+    el('div', { class: 'opt-row' },
+      el('button', { class: 'btn', onclick: () => picker.click() }, hasImage ? 'Replace image' : 'Upload image'),
+      hasImage ? el('button', { class: 'btn', onclick: () => { q.image = null; rerender(); } }, 'Remove image') : null,
+      picker),
+    el('p', { class: 'hint' }, hasImage
+      ? 'Drag on the image to draw each drop zone. Zones must not overlap.'
+      : 'Without an image, zones show as labeled boxes (good for sorting into categories).'));
+  if (hasImage) {
+    wrap.append(field('Image alt text', textInput(q.image.alt, (v) => { q.image.alt = v; touch(); }),
+      'Describe the image for learners using a screen reader.'));
+    const canvas = el('div', { class: 'hs-canvas' }, el('img', { class: 'hs-img', src: q.image.src, alt: q.image.alt || '', draggable: 'false' }));
+    const pct = (n) => `${(n * 100).toFixed(4)}%`;
+    q.zones.forEach((z, i) => {
+      if (z.rect) canvas.append(el('div', { class: 'hs-rect',
+        style: `left:${pct(z.rect.x)};top:${pct(z.rect.y)};width:${pct(z.rect.w)};height:${pct(z.rect.h)}` },
+        el('span', { class: 'hs-rect-num' }, String(i + 1))));
+    });
+    attachRectDraw(canvas, (r) => {
+      // Fill the first zone still missing a region, else add a new zone.
+      const blank = q.zones.find((z) => !z.rect);
+      if (blank) blank.rect = r;
+      else q.zones.push({ id: newZoneId(), label: `Zone ${q.zones.length + 1}`, rect: r });
+      rerender();
+    });
+    wrap.append(canvas);
+  }
+
+  // Zones.
+  wrap.append(el('label', { class: 'dd-sub' }, 'Drop zones'));
+  q.zones.forEach((z, i) => {
+    wrap.append(el('div', { class: 'opt-row' },
+      el('span', { class: 'hs-badge' }, String(i + 1)),
+      el('input', { type: 'text', class: 'opt-label', value: z.label, placeholder: 'Zone label (always announced to screen readers)',
+        'aria-label': `Zone ${i + 1} label`, oninput: (e) => { z.label = e.target.value; touch(); } }),
+      el('input', { type: 'number', class: 'w-score', min: '1', step: '1', value: z.capacity ?? '', placeholder: 'any',
+        title: 'Most items this zone can hold (blank = no limit)', 'aria-label': `Zone ${i + 1} capacity`,
+        oninput: (e) => { const v = parseInt(e.target.value, 10); if (v >= 1) z.capacity = v; else delete z.capacity; touch(); } }),
+      hasImage && !z.rect ? el('span', { class: 'hint' }, 'draw its region') : null,
+      el('button', { class: 'del', 'aria-label': `Remove zone ${i + 1}`, onclick: () => {
+        q.zones = q.zones.filter((x) => x !== z);
+        q.items.forEach((it) => { it.zones = (it.zones || []).filter((zid) => zid !== z.id); });
+        rerender();
+      } }, '\u00d7')));
+  });
+  wrap.append(el('p', { class: 'hint' }, 'Capacity (right-hand box) limits how many items a zone holds; leave blank for no limit.'));
+  if (!hasImage) wrap.append(el('button', { class: 'btn', onclick: () => { q.zones.push({ id: newZoneId(), label: `Zone ${q.zones.length + 1}` }); rerender(); } }, 'Add zone'));
+
+  // Items.
+  wrap.append(el('label', { class: 'dd-sub' }, 'Items to drag'));
+  q.items.forEach((it, i) => {
+    it.zones = it.zones || [];
+    wrap.append(el('div', { class: 'dd-item-row' },
+      el('div', { class: 'opt-row' },
+        el('input', { type: 'text', class: 'opt-label', value: it.label, placeholder: 'Item text',
+          'aria-label': `Item ${i + 1} text`, oninput: (e) => { it.label = e.target.value; touch(); } }),
+        el('button', { class: 'del', 'aria-label': `Remove item ${i + 1}`, onclick: () => { q.items = q.items.filter((x) => x !== it); rerender(); } }, '\u00d7')),
+      el('div', { class: 'dd-accepts', role: 'group', 'aria-label': `Zones that accept item ${i + 1}` },
+        el('span', { class: 'hint' }, 'Correct in:'),
+        ...q.zones.map((z, zi) => el('label', { class: 'inline dd-zone-check' },
+          el('input', { type: 'checkbox', checked: it.zones.includes(z.id), onchange: (e) => {
+            it.zones = e.target.checked ? [...new Set([...it.zones, z.id])] : it.zones.filter((zid) => zid !== z.id);
+            touch(); renderEditor();
+          } }), ` ${zi + 1}. ${z.label || '(unnamed)'}`)),
+        it.zones.length ? null : el('span', { class: 'badge' }, 'Distractor'))));
+  });
+  wrap.append(el('p', { class: 'hint' }, 'Tick every zone where an item counts as correct. An item with no zones ticked is a distractor: it is correct to leave it in the bank.'));
+  wrap.append(el('button', { class: 'btn', onclick: () => {
+    let n = q.items.length + 1; while (q.items.some((x) => x.id === `i${n}`)) n++;
+    q.items.push({ id: `i${n}`, label: `Item ${q.items.length + 1}`, zones: [] }); rerender();
+  } }, 'Add item'));
+  return wrap;
+}
+
 function clamp01(n) { return Math.max(0, Math.min(1, n)); }
 function rectFrom(a, b) {
   return { x: round4(Math.min(a.x, b.x)), y: round4(Math.min(a.y, b.y)),
@@ -371,15 +476,22 @@ function openSettings() {
       .map(([k, l]) => el('label', { class: 'inline' }, el('input', { type: 'checkbox', checked: !!r[k], onchange: (e) => { r[k] = e.target.checked; touch(); } }), ' ' + l))));
 }
 
-function openPreview() {
+/** Preview the whole quiz, or only `question` (in its current, unsaved state). */
+function openPreview(question) {
   const dlg = /** @type {HTMLDialogElement} */ ($('#preview-dialog'));
   const root = $('#preview-root');
   root.innerHTML = '';
+  const assessment = JSON.parse(JSON.stringify(model));
+  if (question && question.id) {
+    assessment.questions = assessment.questions.filter((x) => x.id === question.id);
+    assessment.settings = { ...assessment.settings, shuffleQuestions: false };
+  }
+  $('#preview-title').textContent = question && question.id ? 'Question preview' : 'Learner preview';
   // A fresh in-memory LMS per preview, so the author sees exactly what a real
   // LMS would be sent, including every cmi.interactions record.
   const lms = new MockLMS();
   const refresh = () => renderLmsPanel(lms);
-  new AssessmentPlayer({ root, assessment: JSON.parse(JSON.stringify(model)), preview: true, api: lms,
+  new AssessmentPlayer({ root, assessment, preview: true, api: lms,
     logger: (e) => { if (e.fn === 'SetValue' || e.fn === 'Terminate') refresh(); } }).start();
   refresh();
   setLmsPanel(false); // off by default on every preview
@@ -595,7 +707,7 @@ document.addEventListener('keydown', (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') { e.preventDefault(); saveToLibrary(); }
 });
 $('#btn-validate').addEventListener('click', renderIssues);
-$('#btn-preview').addEventListener('click', openPreview);
+$('#btn-preview').addEventListener('click', () => openPreview());
 $('#btn-export').addEventListener('click', exportScorm);
 $('#btn-settings').addEventListener('click', openSettings);
 $('#preview-lms-toggle').addEventListener('change', (e) => setLmsPanel(e.target.checked));

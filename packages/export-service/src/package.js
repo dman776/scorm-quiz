@@ -38,7 +38,7 @@ export async function buildScormPackage(opts) {
   const files = [];
   const add = (p, content) => { const sp = safeZipPath(p); zip.file(sp, content); files.push(sp); };
 
-  const runtimeFiles = ['player.js', 'adapter.js', 'interactions.js', 'state.js'];
+  const runtimeFiles = ['player.js', 'adapter.js', 'interactions.js', 'state.js', 'dragdrop.js'];
   for (const f of runtimeFiles) add(`runtime/scorm-runtime/src/${f}`, fs.readFileSync(path.join(RUNTIME_DIR, f), 'utf8'));
   const engineFiles = ['scoring.js', 'types.js'];
   for (const f of engineFiles) add(`runtime/engine/src/${f}`, fs.readFileSync(path.join(ENGINE_DIR, f), 'utf8'));
@@ -71,7 +71,10 @@ export function buildAnswerKey(a) {
   let out = `Answer Key: ${a.title}\nVersion ${a.version || '1.0'}\n\n`;
   a.questions.forEach((q, i) => {
     out += `${i + 1}. [${q.kind}] ${q.prompt}\n`;
-    if (q.options) {
+    if (q.kind === 'drag_drop') {
+      const zoneLabel = Object.fromEntries((q.zones || []).map((z) => [z.id, z.label]));
+      out += `   Placements: ${(q.items || []).map((it) => `${it.label} -> ${(it.zones || []).map((z) => zoneLabel[z]).join(' or ') || '(distractor, leave unplaced)'}`).join('; ')}\n`;
+    } else if (q.options) {
       const correct = q.options.filter((o) => o.correct).map((o) => o.label);
       out += `   Correct: ${correct.join('; ') || '(score-based)'}\n`;
     } else if (q.pairs) out += `   Pairs: ${q.pairs.map((p) => `${p.prompt}=${p.match}`).join('; ')}\n`;

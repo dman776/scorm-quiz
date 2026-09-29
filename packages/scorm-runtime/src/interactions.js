@@ -83,6 +83,18 @@ export function buildResponsePatterns(q, response) {
         .map((p) => `${labelIdentifier(p.prompt, 'source')}[.]${labelIdentifier(p.match, 'target')}`).join('[,]');
       return { type, learner, correct };
     }
+    case QUESTION_KINDS.DRAG_DROP: {
+      // item[.]zone pairs. The correct pattern lists each non-distractor item
+      // with its first accepted zone (one pattern; our engine judges the result).
+      const itemIds = responseIdentifiers(q.items);
+      const zoneIds = responseIdentifiers(q.zones);
+      const map = response && typeof response === 'object' ? response : {};
+      const learner = (q.items || []).filter((it) => zoneIds[map[it.id]])
+        .map((it) => `${itemIds[it.id]}[.]${zoneIds[map[it.id]]}`).join('[,]');
+      const correct = (q.items || []).filter((it) => (it.zones || []).some((z) => zoneIds[z]))
+        .map((it) => `${itemIds[it.id]}[.]${zoneIds[it.zones.find((z) => zoneIds[z])]}`).join('[,]');
+      return { type, learner, correct };
+    }
     case QUESTION_KINDS.SEQUENCE: {
       const ids = responseIdentifiers(q.items);
       const learner = asArr(response).map((id) => ids[id] ?? safeInteractionId(id)).join('[,]');

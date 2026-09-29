@@ -7,6 +7,7 @@ import { scoreAssessment, scoreQuestion, maxQuestionScore } from '../../engine/s
 import { QUESTION_KINDS, PRESENTATION } from '../../engine/src/types.js';
 import { ScormAdapter } from './adapter.js';
 import { buildInteraction } from './interactions.js';
+import { renderDragDrop } from './dragdrop.js';
 import { serializeState, deserializeState, validateStateSize, seededShuffle } from './state.js';
 
 const h = (tag, attrs = {}, ...kids) => {
@@ -68,6 +69,8 @@ export class AssessmentPlayer {
       for (const q of this.a.questions) {
         if (Array.isArray(q.options) && q.shuffleOptions !== false)
           answerOrder[q.id] = seededShuffle(q.options.map((o) => o.id), seed + hashStr(q.id));
+        else if (q.kind === QUESTION_KINDS.DRAG_DROP && Array.isArray(q.items) && q.shuffleOptions !== false)
+          answerOrder[q.id] = seededShuffle(q.items.map((it) => it.id), seed + hashStr(q.id));
       }
     }
     this.state = { order: ids, answers: {}, flagged: [], index: 0, submitted: false,
@@ -96,6 +99,16 @@ export class AssessmentPlayer {
     if (!order) return q.options || [];
     const byId = Object.fromEntries((q.options || []).map((o) => [o.id, o]));
     return order.map((id) => byId[id]).filter(Boolean);
+  }
+
+  /** Drag-and-drop items in (possibly shuffled) bank order. */
+  _itemOrder(q) {
+    const order = this.state.answerOrder && this.state.answerOrder[q.id];
+    const items = q.items || [];
+    if (!order) return items;
+    const byId = Object.fromEntries(items.map((it) => [it.id, it]));
+    // Items added after the order was saved go last rather than vanish.
+    return [...order.map((id) => byId[id]).filter(Boolean), ...items.filter((it) => !order.includes(it.id))];
   }
 
   _renderQuestion() {
@@ -225,6 +238,13 @@ export class AssessmentPlayer {
           q.multiple ? 'Select every region that applies.' : 'Select one region on the image.'));
         break;
       }
+      case QUESTION_KINDS.DRAG_DROP: {
+        wrap.append(renderDragDrop({ q, items: this._itemOrder(q), h,
+          getValue: () => this.state.answers[q.id],
+          onChange: (m) => this._answer(q.id, m),
+          announce: (msg) => this._announce(msg) }));
+        break;
+      }
     }
     return wrap;
   }
@@ -259,7 +279,7 @@ export class AssessmentPlayer {
     this._recordLatency();
     this._journal(this.questions[this.state.index]);
     const q = this.questions[this.state.index];
-    if (dir > 0 && this.settings.requireAnswer && this.state.answers[q.id] == null) {
+    if (dir > 0 && this.settings.requireAnswer && !scoreQuestion(q, this.state.answers[q.id]).answered) {
       this._announce('Please answer before continuing.'); return;
     }
     this.state.index = Math.max(0, Math.min(this.questions.length - 1, this.state.index + dir));
@@ -296,8 +316,7 @@ export class AssessmentPlayer {
     screen.append(h('h2', {}, 'Review your answers'));
     const list = h('ul', { class: 'sqb-review' });
     this.questions.forEach((q, i) => {
-      const answered = this.state.answers[q.id] != null &&
-        !(Array.isArray(this.state.answers[q.id]) && this.state.answers[q.id].length === 0);
+      const answered = scoreQuestion(q, this.state.answers[q.id]).answered;
       list.append(h('li', {}, h('button', { type: 'button', class: 'sqb-link',
         onclick: () => { this.state.index = i; this._renderQuestion(); } },
         `Question ${i + 1}: ${answered ? 'Answered' : 'Not answered'}${this.state.flagged.includes(q.id) ? ' (flagged)' : ''}`)));
@@ -362,6 +381,7 @@ export class AssessmentPlayer {
       const fb = res.outcome === 'correct' ? q.correctFeedback
         : res.outcome === 'partial' ? (q.partialFeedback || q.incorrectFeedback) : q.incorrectFeedback;
       if (fb) item.append(h('p', { class: 'sqb-review-fb' }, fb));
+      if (q.kind === QUESTION_KINDS.DRAG_DROP) item.append(dragDropKey(q));
       if (q.rationale) item.append(h('p', { class: 'sqb-review-rationale' }, q.rationale));
       box.append(item);
     }
@@ -373,6 +393,13 @@ export class AssessmentPlayer {
     return this.state.attempt >= max;
   }
   _announce(msg) { this.live.textContent = ''; setTimeout(() => (this.live.textContent = msg), 30); }
+}
+
+/** Correct placement for each item, shown in the answer review. */
+function dragDropKey(q) {
+  const zoneLabel = Object.fromEntries((q.zones || []).map((z) => [z.id, z.label]));
+  return h('ul', { class: 'sqb-review-key' }, (q.items || []).map((it) => h('li', {},
+    `${it.label}: ${(it.zones || []).map((z) => zoneLabel[z]).filter(Boolean).join(' or ') || 'leave unplaced'}`)));
 }
 
 function isoDuration(sec) {

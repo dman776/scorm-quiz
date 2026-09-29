@@ -13,7 +13,8 @@ const a = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../examples/demo-a
 const responses = { 'q1-topology': 'a', 'q2-media': 'fiber', 'q3-osi': ['phys','trans','app'],
   'q4-secure-ports': ['https','ssh'], 'q5-poe': 'true',
   'q6-match-ports': { HTTPS:'443', SSH:'22', DNS:'53', HTTP:'80' },
-  'q7-seq-osi': ['l1','l2','l3','l4'], 'q8-subnet': 254, 'q9-shortanswer': 'NAT' };
+  'q7-seq-osi': ['l1','l2','l3','l4'], 'q8-subnet': 254, 'q9-shortanswer': 'NAT',
+  'q10-dd-devices': { router: 'z1', switch: 'z2', bridge: 'z2' } };
 const lms = new MockLMS();
 const adapter = new ScormAdapter({ api: lms });
 adapter.initialize();

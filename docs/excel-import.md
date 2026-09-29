@@ -43,8 +43,8 @@ Correct, Tolerance, Units, Correct Feedback, Incorrect Feedback, Rationale.**
 - **Type** accepts the canonical values and common aliases:
   `single_select`, `single_select_pill`, `multiple_select`,
   `multiple_select_pill`, `true_false`, `single_checkbox`, `matching`,
-  `sequence`, `numeric`, `short_answer` (aliases like `mc`, `checkbox`, `tf`,
-  `ordering`, `fill-in` also work).
+  `sequence`, `numeric`, `short_answer`, `drag_drop` (aliases like `mc`,
+  `checkbox`, `tf`, `ordering`, `fill-in`, `drag and drop`, `categorize` also work).
 - **Scoring** optional: `all_or_nothing`, `partial`, or `weighted`.
 
 ## Options-column encoding (the important part)
@@ -63,6 +63,7 @@ and short-answer keys which go in **Correct**.
 | sequence | `Physical > Data Link > Network` (correct order) | - |
 | numeric | (blank) | the value, e.g. `254` (Tolerance/Units optional) |
 | short_answer | (blank) | `NAT \| Network Address Translation` |
+| drag_drop | `Router=Network \| Switch=Data Link \| Repeater=` | - |
 
 Rules:
 - A leading `*` marks a correct option.
@@ -70,6 +71,11 @@ Rules:
   penalty). When any option is scored, use `weighted` scoring to sum them.
 - Pipes `|` separate options; `=` separates matching pairs; `>` separates the
   sequence order.
+- drag_drop: each token is `item=zone`. Zones are created as labeled boxes in the
+  order they first appear. `Item=Zone A ; Zone B` accepts either zone; `Item=`
+  (nothing after `=`) is a distractor; `=Zone` adds a zone with no correct item;
+  `Zone[n]` caps the zone at n items. Zones on a background image must be drawn
+  in the builder.
 
 ## What happens on import
 

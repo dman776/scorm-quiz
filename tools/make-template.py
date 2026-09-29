@@ -40,12 +40,12 @@ lines = [
     "QUESTIONS SHEET COLUMNS",
     "  ID                 Optional. Leave blank to auto-generate from the prompt.",
     "  Type               One of: single_select, single_select_pill, multiple_select, multiple_select_pill,",
-    "                     true_false, single_checkbox, matching, sequence, numeric, short_answer.",
+    "                     true_false, single_checkbox, matching, sequence, numeric, short_answer, drag_drop.",
     "  Prompt             The question text shown to the learner. (Required)",
     "  Points             Point value for the question. Defaults to 1.",
     "  Objective          Optional learning objective.",
     "  Section            Optional grouping/topic.",
-    "  Scoring            Optional: all_or_nothing, partial, or weighted (choice/matching/sequence).",
+    "  Scoring            Optional: all_or_nothing, partial, or weighted (choice/matching/sequence/drag_drop).",
     "  Options            The answers. Encoding depends on Type (see below).",
     "  Correct            Used for numeric (the value), short_answer (accepted answers), true_false, single_checkbox.",
     "  Tolerance          Numeric only. Allowed +/- range. Defaults to 0.",
@@ -71,6 +71,11 @@ lines = [
     "     Leave Options blank. Correct = the value (e.g. 254). Tolerance and Units optional.",
     "  short_answer:",
     "     Leave Options blank. Correct = accepted answers separated by |  ->  NAT | Network Address Translation",
+    "  drag_drop (items into labeled boxes):",
+    "     Options = item=zone pairs separated by |  ->  Router=Network | Switch=Data Link | Repeater=",
+    "     Zones are created in the order they first appear. Item=Zone A ; Zone B accepts either zone.",
+    "     Nothing after = makes a distractor (correct to leave unplaced). =Zone adds a zone with no correct item.",
+    "     Zone[n] limits a zone to n items, e.g. Router=Network[1]. Background-image zones need the builder.",
     "",
     "TIP: The example rows already in the Questions sheet are a working quiz. Edit or delete them.",
 ]
@@ -179,6 +184,11 @@ examples = [
      "NAT | Network Address Translation", "", "",
      "Correct, NAT translates private to public addressing.",
      "The answer is NAT.", "NAT lets many private hosts share public addresses."],
+    ["", "drag_drop", "Drag each device onto the OSI layer where it primarily operates.", 3,
+     "Map devices to OSI layers", "OSI Model", "partial",
+     "Router=Network | Switch=Data Link | Bridge=Data Link | Repeater=", "", "", "",
+     "Correct placement.", "Check which address each device reads: IP or MAC.",
+     "Routers read IP (Layer 3); switches and bridges read MAC (Layer 2); a repeater is Layer 1."],
 ]
 for r, row in enumerate(examples, start=2):
     for c, val in enumerate(row, start=1):
@@ -195,7 +205,7 @@ for c, w in enumerate(widths, start=1):
 qs.freeze_panes = "A2"
 
 # Type dropdown for guidance (non-blocking)
-types = "single_select,single_select_pill,multiple_select,multiple_select_pill,true_false,single_checkbox,matching,sequence,numeric,short_answer"
+types = "single_select,single_select_pill,multiple_select,multiple_select_pill,true_false,single_checkbox,matching,sequence,numeric,short_answer,drag_drop"
 dv = DataValidation(type="list", formula1=f'"{types}"', allow_blank=True, showDropDown=False)
 qs.add_data_validation(dv)
 dv.add(f"B2:B200")

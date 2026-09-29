@@ -20,6 +20,12 @@
  *   sequence        : "Physical > Data Link > Network > Transport"  (correct order)
  *   numeric         : Options blank; Correct = value; Tolerance / Units optional
  *   short_answer    : Options blank; Correct = "NAT | Network Address Translation"
+ *   drag_drop       : "Router=Network | Switch=Data Link | Hub="   (item=zone)
+ *       - zones are created in order of first appearance, as labeled boxes
+ *       - "Item=Zone A ; Zone B" accepts either zone
+ *       - "Hub=" (nothing after =) makes a distractor that belongs nowhere
+ *       - "=Session" (nothing before =) adds a zone with no correct item
+ *       - "[n]" after a zone sets its capacity: "Router=Network[1]"
  */
 import JSZip from 'jszip';
 
@@ -193,6 +199,30 @@ function parseChoiceOptions(cell) {
   });
 }
 
+/** Parse a drag_drop Options cell ("Item=Zone ; Zone | Distractor= | =Empty zone"). */
+function parseDragDrop(cell) {
+  const zones = [];
+  const zoneFor = (raw) => {
+    let label = raw.trim();
+    let capacity;
+    const cm = /\[(\d+)\]\s*$/.exec(label);
+    if (cm) { capacity = parseInt(cm[1], 10); label = label.slice(0, cm.index).trim(); }
+    if (!label) return null;
+    let z = zones.find((x) => x.label.toLowerCase() === label.toLowerCase());
+    if (!z) { z = { id: `z${zones.length + 1}`, label }; zones.push(z); }
+    if (capacity >= 1) z.capacity = capacity;
+    return z.id;
+  };
+  const items = [];
+  for (const token of String(cell).split('|').map((t) => t.trim()).filter(Boolean)) {
+    const eq = token.indexOf('=');
+    const label = (eq < 0 ? token : token.slice(0, eq)).trim();
+    const zoneIds = eq < 0 ? [] : token.slice(eq + 1).split(';').map(zoneFor).filter(Boolean);
+    if (label) items.push({ id: `i${items.length + 1}`, label, zones: [...new Set(zoneIds)] });
+  }
+  return { zones, items };
+}
+
 const TYPE_ALIASES = {
   single: 'single_select', singleselect: 'single_select', mc: 'single_select', multiplechoice: 'single_select',
   radio: 'single_select', singleselectpill: 'single_select_pill', singlepill: 'single_select_pill',
@@ -203,6 +233,8 @@ const TYPE_ALIASES = {
   ack: 'single_checkbox', acknowledgement: 'single_checkbox', singlecheckbox: 'single_checkbox',
   match: 'matching', matching: 'matching', order: 'sequence', ordering: 'sequence', sequence: 'sequence',
   number: 'numeric', numeric: 'numeric', shortanswer: 'short_answer', fillin: 'short_answer', text: 'short_answer',
+  dragdrop: 'drag_drop', draganddrop: 'drag_drop', dragndrop: 'drag_drop', dnd: 'drag_drop',
+  categorize: 'drag_drop', categorise: 'drag_drop', sort: 'drag_drop',
 };
 function normalizeType(raw) {
   const key = String(raw || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
@@ -280,6 +312,12 @@ function buildQuestion(row, idx) {
     case 'short_answer': {
       q.accepted = String(correctCell).split('|').map((t) => t.trim()).filter(Boolean);
       q.caseSensitive = YES(pick(row, idx, 'casesensitive'));
+      break;
+    }
+    case 'drag_drop': {
+      Object.assign(q, parseDragDrop(optionsCell));
+      q.image = null;
+      if (!q.scoringStrategy) q.scoringStrategy = 'partial';
       break;
     }
     case 'hotspot': {

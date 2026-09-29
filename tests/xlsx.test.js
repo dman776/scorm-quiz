@@ -15,16 +15,16 @@ test('template.xlsx exists (run tools/make-template.py to (re)generate)', () => 
   assert.ok(fs.existsSync(templatePath), 'examples/template.xlsx missing');
 });
 
-test('importXlsx parses all 8 question types from the template', async () => {
+test('importXlsx parses all 9 question types from the template', async () => {
   const a = await importXlsx(fs.readFileSync(templatePath));
   assert.equal(a.schemaVersion, 1);
   assert.equal(a.title, 'ASCEND Sample Quiz');
   assert.equal(a.settings.passingPercent, 80);
   assert.equal(a.settings.maxAttempts, 2);
   const kinds = new Set(a.questions.map((q) => q.kind));
-  for (const k of ['single_select', 'multiple_select', 'true_false', 'single_checkbox', 'matching', 'sequence', 'numeric', 'short_answer'])
+  for (const k of ['single_select', 'multiple_select', 'true_false', 'single_checkbox', 'matching', 'sequence', 'numeric', 'short_answer', 'drag_drop'])
     assert.ok(kinds.has(k), `missing kind ${k}`);
-  assert.equal(a.questions.length, 10);
+  assert.equal(a.questions.length, 11);
 });
 
 test('imported assessment passes validation with zero errors', async () => {

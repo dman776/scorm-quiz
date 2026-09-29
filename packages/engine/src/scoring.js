@@ -117,6 +117,26 @@ export function scoreQuestion(q, response) {
         outcome: all ? 'correct' : score > 0 ? 'partial' : 'incorrect', answered: true };
     }
 
+    case QUESTION_KINDS.DRAG_DROP: {
+      // response: { itemId: zoneId }. An item is right when it sits in one of
+      // its accepted zones; a distractor (no accepted zones) placed anywhere
+      // counts against the learner.
+      const map = response && typeof response === 'object' ? response : {};
+      const zoneIds = new Set((q.zones || []).map((z) => z.id));
+      const placed = (it) => zoneIds.has(map[it.id]);
+      const items = q.items || [];
+      if (!items.some(placed)) return unanswered();
+      const targets = items.filter((it) => (it.zones || []).length > 0);
+      const right = targets.filter((it) => placed(it) && it.zones.includes(map[it.id])).length;
+      const wrongDistractors = items.filter((it) => !(it.zones || []).length && placed(it)).length;
+      const all = targets.length > 0 && right === targets.length && wrongDistractors === 0;
+      let score;
+      if (strategy === SCORING_STRATEGY.ALL_OR_NOTHING) score = all ? max : 0;
+      else score = clampQuestionScore(targets.length ? (max * (right - wrongDistractors)) / targets.length : 0, max, allowNeg);
+      return { questionId: q.id, score: round2(score), max,
+        outcome: all ? 'correct' : score > 0 ? 'partial' : 'incorrect', answered: true };
+    }
+
     case QUESTION_KINDS.SEQUENCE: {
       const order = asArray(response);
       if (order.length === 0) return unanswered();

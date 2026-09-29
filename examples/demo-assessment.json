@@ -187,6 +187,29 @@
       "correctFeedback": "Correct. NAT translates private to public addressing.",
       "incorrectFeedback": "The answer is NAT (Network Address Translation).",
       "rationale": "NAT allows many private hosts to share one or more public addresses."
+    },
+    {
+      "id": "q10-dd-devices",
+      "kind": "drag_drop",
+      "section": "OSI",
+      "objective": "Map devices to OSI layers",
+      "prompt": "Drag each device onto the OSI layer where it primarily operates. One item does not belong on either layer.",
+      "points": 3,
+      "scoringStrategy": "partial",
+      "image": null,
+      "zones": [
+        { "id": "z1", "label": "Layer 3: Network" },
+        { "id": "z2", "label": "Layer 2: Data Link" }
+      ],
+      "items": [
+        { "id": "router", "label": "Router", "zones": ["z1"] },
+        { "id": "switch", "label": "Switch", "zones": ["z2"] },
+        { "id": "bridge", "label": "Bridge", "zones": ["z2"] },
+        { "id": "repeater", "label": "Repeater", "zones": [] }
+      ],
+      "correctFeedback": "Correct. Routers forward packets by IP address; switches and bridges forward frames by MAC address.",
+      "incorrectFeedback": "Review which address each device reads: IP (Layer 3) or MAC (Layer 2).",
+      "rationale": "A repeater only regenerates the signal, so it works at Layer 1 and belongs on neither layer."
     }
   ]
 }

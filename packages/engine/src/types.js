@@ -16,6 +16,7 @@ export const QUESTION_KINDS = Object.freeze({
   NUMERIC: 'numeric',
   SHORT_ANSWER: 'short_answer',
   HOTSPOT: 'hotspot',
+  DRAG_DROP: 'drag_drop',
 });
 
 /** Presentation styles for choice questions. */
@@ -38,6 +39,8 @@ export const SCORM_INTERACTION_TYPE = Object.freeze({
   numeric: 'numeric',
   short_answer: 'fill-in',
   hotspot: 'choice',
+  // SCORM 2004 has no drag-and-drop type; item->zone pairs are a matching.
+  drag_drop: 'matching',
 });
 
 /**
@@ -87,7 +90,7 @@ export const PROJECT_SCHEMA_VERSION = 1;
 /** Conservative SCORM 2004 suspend_data limit (chars) used for warnings. */
 export const SUSPEND_DATA_LIMIT = 64000;
 
-/** Per-image cap for embedded hotspot images, in raw (decoded) bytes. Not a SCORM limit. */
+/** Per-image cap for embedded hotspot / drag-and-drop images, in raw (decoded) bytes. Not a SCORM limit. */
 export const MAX_HOTSPOT_IMAGE_BYTES = 5 * 1024 * 1024;
 
 /** Decoded byte size of a base64 data URI, without decoding it. */

@@ -15,7 +15,7 @@ and runs with **no internet connectivity and no external CDNs**.
 
 | Capability | Command | Status |
 | --- | --- | --- |
-| Deterministic scoring engine (9 types + strategies) | `npm test` | pass |
+| Deterministic scoring engine (10 types + strategies) | `npm test` | pass |
 | SCORM interaction formatting / manifest / adapter | `npm test` | pass |
 | Excel import (parse template into a valid quiz) | `npm test` | 8 xlsx tests pass |
 | Build a real SCORM 2004 4th Ed. ZIP | `npm run build:scorm` | dist/*.zip |
@@ -24,7 +24,7 @@ and runs with **no internet connectivity and no external CDNs**.
 | Authoring UI + REST API on one port | `npm start` | http://localhost:4000 |
 | JS strict typecheck | `npm run typecheck` | clean |
 
-Total automated tests: **52 passing** (node built-in runner, no install needed).
+Total automated tests: **66 passing** (node built-in runner, no install needed).
 
 ## Quick start
 
@@ -44,6 +44,16 @@ live in `$SQB_DATA_DIR/quizzes/`).
 
 Only runtime deps are `jszip` (packaging + xlsx parsing) and `nanoid` (ids),
 already vendored under `node_modules`.
+
+## New in 1.3.0
+
+- **Drag and drop question type**: learners place items into labeled boxes or
+  zones drawn on a picture. Works with mouse, touch, click/tap-to-place and
+  keyboard (WCAG 2.2 dragging alternative), supports distractors, items correct
+  in several zones, and zone capacities; reports to the LMS as a `matching`
+  interaction; box-style questions import from Excel.
+- **Preview this question**: preview just the question you are editing, from the
+  question editor.
 
 ## New in 1.2.0
 

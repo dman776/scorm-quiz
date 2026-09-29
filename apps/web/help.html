@@ -198,6 +198,7 @@
         <tr><td>Numeric</td><td>Enter a number; correct within an exact value or tolerance.</td></tr>
         <tr><td>Short answer</td><td>Type text matched against accepted answers.</td></tr>
         <tr><td>Hotspot (click the image)</td><td>Click one or more regions on a picture, diagram or screenshot.</td></tr>
+        <tr><td>Drag and drop</td><td>Drag items into labeled boxes (sorting into categories) or onto zones drawn on a picture.</td></tr>
       </table>
 
       <h4>Building a hotspot question</h4>
@@ -213,6 +214,26 @@
       </ol>
       <p>Regions are stored as fractions of the image, so they stay put when the image scales on smaller screens.
         Hotspot questions cannot be created from Excel, because a spreadsheet cannot carry the image.</p>
+
+      <h4>Building a drag-and-drop question</h4>
+      <ol>
+        <li>Add a <strong>Drag and drop</strong> question. It starts with two zones and two items.</li>
+        <li>Choose a layout. With no image, zones show as <strong>labeled boxes</strong>; use <strong>Add zone</strong>
+          for more. To place zones on a picture, <strong>Upload image</strong> and <strong>drag a box</strong> on it for
+          each zone (zones must not overlap), and fill in the alt text.</li>
+        <li>Give every zone a label. Labels are always read to screen readers, and shown on the boxes.</li>
+        <li>Optionally set a zone's <strong>capacity</strong> (the right-hand box) to limit how many items it holds.
+          Leave it blank for no limit; 1 gives classic "label the diagram".</li>
+        <li>Add the <strong>items</strong> and tick every zone where each one is correct. An item with no zone ticked is a
+          <strong>distractor</strong>: the right answer is to leave it in the item bank.</li>
+        <li>Pick <strong>Partial credit</strong> (each item counts; a placed distractor cancels one) or
+          <strong>All or nothing</strong>.</li>
+      </ol>
+      <p>Learners can drag with a mouse or finger, or click/tap an item and then click/tap a zone. With a keyboard:
+        <kbd>Space</kbd> picks an item up, <kbd>Tab</kbd> moves to a zone, <kbd>Enter</kbd> places it, and
+        <kbd>Escape</kbd> cancels. Items snap into zones, so only which zone matters. The LMS receives a
+        <code>matching</code> interaction such as <code>Router[.]Network[,]Switch[.]Data_Link</code>. Box-style questions
+        can be imported from Excel (see <a href="#template">the template format</a>).</p>
 
       <h3 id="editor">The question editor</h3>
       <p>Selecting a question in the list opens it in the center panel. Common fields for every type:</p>
@@ -304,6 +325,7 @@
         <tr><td>sequence</td><td><code>Physical &gt; Data Link &gt; Network</code></td><td>-</td></tr>
         <tr><td>numeric</td><td>(blank)</td><td>the value, e.g. <code>254</code></td></tr>
         <tr><td>short_answer</td><td>(blank)</td><td><code>NAT | Network Address Translation</code></td></tr>
+        <tr><td>drag_drop</td><td><code>Router=Network | Switch=Data Link | Repeater=</code> (<code>Item=A ; B</code> accepts either zone, <code>Item=</code> is a distractor, <code>Zone[2]</code> caps a zone)</td><td>-</td></tr>
       </table>
       <ul class="tight">
         <li>A leading <code>*</code> marks a correct option.</li>

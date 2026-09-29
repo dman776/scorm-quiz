@@ -121,3 +121,11 @@ body { margin: 0; font-family: var(--font); color: var(--ink); background: var(-
 @media (max-width: 900px) { .preview-body.with-lms { grid-template-columns: 1fr; } .preview-lms { border-left: none; border-top: 1px solid var(--border); } }
 .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .inline { display: flex; align-items: center; gap: 8px; }
+
+/* Drag-and-drop editor */
+.dd-sub { margin-top: 14px; }
+.dd-item-row { border: 1px solid var(--border); border-radius: 8px; padding: 8px; margin-bottom: 8px; background: #fbfcfe; }
+.dd-item-row .opt-row { margin-bottom: 4px; }
+.dd-accepts { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; font-size: .85rem; }
+.dd-accepts .hint { margin: 0; }
+.field .dd-zone-check { display: inline-flex; font-weight: 400; margin: 0; }
