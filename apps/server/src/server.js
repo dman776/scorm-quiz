@@ -24,18 +24,60 @@ fs.mkdirSync(QUIZ_DIR, { recursive: true });
 const PORT = Number(process.env.PORT || 4000);
 const MAX_BODY = 8 * 1024 * 1024; // 8MB (xlsx uploads)
 
+/** Filename-safe slug for a new library file. */
+function slugify(s) {
+  return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'quiz';
+}
+
+/**
+ * The library: every `*.json` file in data/quizzes, addressed by its file name
+ * without `.json`. Files are identified by name, not by the quiz id inside
+ * them, so files added by hand (any name, duplicate ids) all show up and open.
+ */
 const store = {
-  file: (id) => path.join(QUIZ_DIR, `${String(id).replace(/[^A-Za-z0-9_-]/g, '')}.json`),
-  list() {
-    const out = [];
-    for (const f of fs.readdirSync(QUIZ_DIR).filter((f) => f.endsWith('.json') && !f.startsWith('_'))) {
-      try { out.push(JSON.parse(fs.readFileSync(path.join(QUIZ_DIR, f), 'utf8'))); } catch (_e) { /* skip corrupt */ }
-    }
-    return out.sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+  /** Path of an existing-or-new library file, or null if `name` is not a plain file name. */
+  file(name) {
+    name = String(name || '');
+    if (!name || name.startsWith('.') || /[\\/\0]/.test(name)) return null;
+    const f = path.join(QUIZ_DIR, `${name}.json`);
+    return path.dirname(f) === QUIZ_DIR ? f : null;
   },
-  get(id) { const f = store.file(id); return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : null; },
-  put(a) { fs.writeFileSync(store.file(a.id), JSON.stringify(a, null, 2)); return a; },
-  del(id) { const f = store.file(id); if (fs.existsSync(f)) { fs.unlinkSync(f); return true; } return false; },
+  names() {
+    return fs.readdirSync(QUIZ_DIR).filter((f) => f.endsWith('.json') && !f.startsWith('.') && !f.startsWith('_'))
+      .map((f) => f.slice(0, -5));
+  },
+  /** Summaries of every file, newest first. Unreadable files are listed with an error. */
+  list() {
+    return store.names().map((name) => {
+      const f = path.join(QUIZ_DIR, `${name}.json`);
+      const modifiedAt = fs.statSync(f).mtime.toISOString();
+      try {
+        const a = JSON.parse(fs.readFileSync(f, 'utf8'));
+        if (!a || typeof a !== 'object' || !Array.isArray(a.questions)) throw new Error('not a quiz project (no questions array)');
+        return { file: name, id: a.id, title: a.title, description: a.description, status: a.status,
+          version: a.version, updatedAt: a.updatedAt, modifiedAt, questionCount: a.questions.length,
+          passingPercent: a.settings?.passingPercent ?? 80, scormVersion: '2004 4th Edition' };
+      } catch (err) {
+        return { file: name, modifiedAt, error: `Cannot read: ${err.message}` };
+      }
+    }).sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt));
+  },
+  get(name) {
+    const f = store.file(name);
+    return f && fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : null;
+  },
+  /** Write to an existing or explicitly named file. */
+  put(name, a) { fs.writeFileSync(/** @type {string} */ (store.file(name)), JSON.stringify(a, null, 2)); return a; },
+  /** Write to a NEW file named after `base`, adding -2, -3... so nothing is overwritten. */
+  create(base, a) {
+    const stem = slugify(base);
+    const taken = new Set(store.names().map((n) => n.toLowerCase()));
+    let name = stem;
+    for (let n = 2; taken.has(name); n++) name = `${stem}-${n}`;
+    fs.writeFileSync(path.join(QUIZ_DIR, `${name}.json`), JSON.stringify(a, null, 2), { flag: 'wx' });
+    return name;
+  },
+  del(name) { const f = store.file(name); if (f && fs.existsSync(f)) { fs.unlinkSync(f); return true; } return false; },
 };
 function auditExport(entry) {
   fs.appendFileSync(path.join(DATA_DIR, '_export-audit.log'), JSON.stringify({ ...entry, t: new Date().toISOString() }) + '\n');
@@ -106,7 +148,7 @@ const server = http.createServer(async (req, res) => {
   // >>> AUTH MIDDLEWARE SEAM: verify session/JWT here in production <<<
 
   const url = new URL(req.url || '/', `http://localhost:${PORT}`);
-  const parts = url.pathname.split('/').filter(Boolean);
+  const parts = url.pathname.split('/').filter(Boolean).map((p) => { try { return decodeURIComponent(p); } catch { return p; } });
 
   try {
     if (parts[0] !== 'api') {
@@ -129,29 +171,30 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (parts[1] === 'assessments' && parts.length === 2) {
-      if (req.method === 'GET') {
-        const list = store.list().map((a) => ({
-          id: a.id, title: a.title, description: a.description, status: a.status,
-          version: a.version, updatedAt: a.updatedAt, questionCount: a.questions.length,
-          passingPercent: a.settings?.passingPercent ?? 80, scormVersion: '2004 4th Edition',
-        }));
-        return json(res, 200, { assessments: list });
+      if (req.method === 'GET') return json(res, 200, { assessments: store.list() });
+      // Always a new file, named after the title; never overwrites.
+      if (req.method === 'POST') {
+        const a = { ...newAssessment(await readBody(req)), updatedAt: new Date().toISOString() };
+        const file = store.create(a.title, a);
+        return json(res, 201, { file, assessment: a });
       }
-      if (req.method === 'POST') { const a = store.put(newAssessment(await readBody(req))); return json(res, 201, a); }
     }
 
     if (parts[1] === 'assessments' && parts[2]) {
-      const id = parts[2];
+      const name = parts[2];
       const action = parts[3];
-      const existing = store.get(id);
+      if (!store.file(name)) return json(res, 400, { error: 'Invalid file name' });
+      let existing;
+      try { existing = store.get(name); } catch (_e) { existing = null; }
       if (!action) {
         if (req.method === 'GET') return existing ? json(res, 200, existing) : json(res, 404, { error: 'Not found' });
+        // Overwrite this file with the editor copy (the quiz id inside is kept as sent).
         if (req.method === 'PUT') {
           const body = await readBody(req);
-          const merged = { ...(existing || newAssessment({ id })), ...body, id, updatedAt: new Date().toISOString() };
-          return json(res, 200, store.put(merged));
+          const merged = { ...(existing || newAssessment({ id: body.id || name })), ...body, updatedAt: new Date().toISOString() };
+          return json(res, 200, { file: name, assessment: store.put(name, merged) });
         }
-        if (req.method === 'DELETE') { const ok = store.del(id); return json(res, ok ? 200 : 404, { deleted: ok }); }
+        if (req.method === 'DELETE') { const ok = store.del(name); return json(res, ok ? 200 : 404, { deleted: ok }); }
       }
       // validate/export use the posted editor copy when there is one, so
       // unsaved edits are what gets checked and packaged.
@@ -187,7 +230,8 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       if (!body || body.schemaVersion !== 1 || !Array.isArray(body.questions))
         return json(res, 400, { error: 'Invalid or unsupported project file' });
-      return json(res, 201, store.put(newAssessment(body)));
+      const a = { ...newAssessment(body), updatedAt: new Date().toISOString() };
+      return json(res, 201, { file: store.create(a.title, a), assessment: a });
     }
 
     json(res, 404, { error: 'Not found' });

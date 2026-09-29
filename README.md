@@ -52,8 +52,10 @@ already vendored under `node_modules`.
   correct answer as readable text (not internal option ids), the result,
   weighting, latency and objective. Questions are reported as the learner moves
   past them and finalized on submit, so an unfinished attempt still reports.
-- **Library**: Save quizzes to the server, then open, delete, create and import
-  them from one Library screen. Unsaved changes are flagged and confirmed.
+- **Library**: every `.json` file in `data/quizzes/` is listed (with its file
+  name) and can be opened or deleted. Save updates the open file; a new or
+  imported quiz is saved to a new file named after its title, never over another
+  quiz; Save as… makes a copy. Unsaved changes are flagged and confirmed.
 - **One command**: `npm start` runs the UI and the API together.
 - **What the LMS receives**: Preview shows the exact CMI data a real LMS would
   get, and flags anything a strict LMS would reject.

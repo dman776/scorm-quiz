@@ -141,12 +141,17 @@
       <a class="back-top" href="#overview">Back to top</a>
 
       <h2 id="library">Top menu: Library &amp; Save</h2>
-      <p><span class="btn-chip">Library</span> lists every saved quiz with its version, question count, passing score
-        and when it was last saved. From there you can <strong>Open</strong> or <strong>Delete</strong> a quiz, start a
+      <p><span class="btn-chip">Library</span> lists every <code>.json</code> file in the <code>data/quizzes/</code>
+        folder, with its title, file name, version, question count, passing score and when it was last saved. Files you
+        copy into that folder yourself show up too; a file that is not a valid quiz is listed in red so you can delete it. From there you can <strong>Open</strong> or <strong>Delete</strong> a quiz, start a
         <strong>+ New quiz</strong>, import from Excel or a project JSON file, export the open quiz as project JSON, and
         download the Excel template. The quiz you have open is highlighted.</p>
-      <p><span class="btn-chip">Save</span> (or <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>S</kbd>) writes the open quiz to the
-        Library. Imports and new quizzes are not in the Library until you save them.</p>
+      <p><span class="btn-chip">Save</span> (or <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>S</kbd>) updates the file the quiz
+        was opened from. A new or imported quiz is not in the Library until you save it; its first Save creates a
+        <strong>new</strong> file named after the title (<code>my-quiz.json</code>, then <code>my-quiz-2.json</code> and
+        so on), so saving never overwrites a different quiz. Hover the status in the top bar to see which file is open.</p>
+      <p><span class="btn-chip">Save as…</span> saves a copy under a new title, as a new file, and keeps the copy open.
+        The original file is left as it was.</p>
       <div class="warn">Opening, importing or starting another quiz replaces what is on screen. If the current quiz has
         unsaved changes you are asked to confirm first.</div>
 

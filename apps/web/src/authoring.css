@@ -55,6 +55,10 @@ body { margin: 0; font-family: var(--font); color: var(--ink); background: var(-
 .lib-item-main { min-width: 0; }
 .lib-name { font-weight: 600; overflow-wrap: anywhere; }
 .lib-meta { color: var(--muted); font-size: .8rem; margin-top: 2px; }
+.lib-file { font-family: ui-monospace, Menlo, monospace; font-size: .75rem; color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; }
+.lib-dir { margin: -6px 0 10px; color: var(--muted); font-size: .78rem; }
+.lib-item.broken { border-color: var(--danger); background: #fdf6f5; }
+.lib-item.broken .lib-meta { color: var(--danger); }
 .lib-item-actions { display: flex; gap: 6px; flex: none; }
 .btn-small { padding: 5px 10px; font-size: .85rem; }
 .btn-danger { border-color: var(--danger); color: var(--danger); }

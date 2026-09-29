@@ -37,6 +37,12 @@ const draft = load();
 let model = draft || blankQuiz();
 /** True when the editor holds changes the library does not have. */
 let dirty = draft ? localStorage.getItem('sqb-dirty') === '1' : false;
+/**
+ * Library file (name without .json, in data/quizzes) the editor saves to, or
+ * null if this quiz has never been saved; Save then creates a new file.
+ * Drafts from before this was tracked were saved under their quiz id.
+ */
+let libraryFile = draft ? (localStorage.getItem('sqb-file') ?? (draft.updatedAt ? draft.id : null)) : null;
 let activeId = model.questions[0]?.id || null;
 
 function blankQuiz() {
@@ -57,6 +63,7 @@ function save() {
   try {
     localStorage.setItem('sqb-project', JSON.stringify(model));
     localStorage.setItem('sqb-dirty', dirty ? '1' : '0');
+    if (libraryFile) localStorage.setItem('sqb-file', libraryFile); else localStorage.removeItem('sqb-file');
   } catch { /* the library copy is unaffected */ }
 }
 function load() { try { return JSON.parse(localStorage.getItem('sqb-project') || 'null'); } catch { return null; } }
@@ -65,8 +72,8 @@ function touch() { setDirty(true); clearTimeout(saveTimer); saveTimer = setTimeo
 function setDirty(d) {
   dirty = d;
   const pill = $('#save-state');
-  // updatedAt is stamped by the server, so its absence means never saved.
-  pill.textContent = d ? 'Unsaved changes' : model.updatedAt ? 'Saved to library' : 'Not saved';
+  pill.textContent = d ? 'Unsaved changes' : libraryFile ? 'Saved to library' : 'Not saved';
+  pill.title = libraryFile ? `data/quizzes/${libraryFile}.json` : 'Not in the library yet; Save creates a new file';
   pill.classList.toggle('dirty', d);
 }
 /** Unsaved work worth warning about before it is replaced. */
@@ -466,41 +473,63 @@ async function api(pathname, init) {
   return data;
 }
 
-function replaceModel(next, { isDirty }) {
+function replaceModel(next, { isDirty, file = null }) {
   model = next;
+  libraryFile = file;
   activeId = model.questions[0]?.id || null;
   setDirty(isDirty); save(); render();
 }
 
+/**
+ * Save updates the file this quiz was opened from. A quiz not yet in the
+ * library (new or imported) goes to a NEW file named after its title, so
+ * saving never overwrites a different quiz.
+ */
 async function saveToLibrary() {
   try {
-    const saved = await api(`/api/assessments/${encodeURIComponent(model.id)}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(model) });
-    model.updatedAt = saved.updatedAt;
+    const body = JSON.stringify(model);
+    const headers = { 'Content-Type': 'application/json' };
+    const saved = libraryFile
+      ? await api(`/api/assessments/${encodeURIComponent(libraryFile)}`, { method: 'PUT', headers, body })
+      : await api('/api/assessments', { method: 'POST', headers, body });
+    model.updatedAt = saved.assessment.updatedAt;
+    libraryFile = saved.file;
     setDirty(false); save();
     if (view === 'library') openLibrary();
   } catch (err) { alert('Save failed. ' + err.message); }
 }
 
+/** Save a copy as a new quiz (new title, new quiz id, new file); the copy stays open. */
+async function saveAsCopy() {
+  const title = prompt('Save a copy as (quiz title):', `${model.title || 'Untitled'} (copy)`);
+  if (title == null || !title.trim()) return;
+  model.title = model.lmsTitle = title.trim();
+  model.id = uid('assessment');
+  libraryFile = null;
+  await saveToLibrary();
+  render();
+}
+
 function newQuiz() {
   if (hasUnsaved() && !confirm('Start a new quiz? The current quiz has unsaved changes that will be lost.')) return;
   model = blankQuiz();
+  libraryFile = null;
   activeId = null;
   setDirty(true); save(); render(); openSettings();
 }
 
-async function openFromLibrary(id) {
-  if (id !== model.id && hasUnsaved() && !confirm('Open another quiz? The current quiz has unsaved changes that will be lost.')) return;
-  try { replaceModel(await api(`/api/assessments/${encodeURIComponent(id)}`), { isDirty: false }); }
+async function openFromLibrary(file) {
+  if (file !== libraryFile && hasUnsaved() && !confirm('Open another quiz? The current quiz has unsaved changes that will be lost.')) return;
+  try { replaceModel(await api(`/api/assessments/${encodeURIComponent(file)}`), { isDirty: false, file }); }
   catch (err) { alert('Could not open that quiz. ' + err.message); }
 }
 
 async function deleteFromLibrary(item) {
-  if (!confirm(`Delete "${item.title}" from the library? This cannot be undone.`)) return;
+  if (!confirm(`Delete "${item.title || item.file}" (${item.file}.json) from the library? This cannot be undone.`)) return;
   try {
-    await api(`/api/assessments/${encodeURIComponent(item.id)}`, { method: 'DELETE' });
+    await api(`/api/assessments/${encodeURIComponent(item.file)}`, { method: 'DELETE' });
     // Still open in the editor, but no longer saved anywhere.
-    if (item.id === model.id) setDirty(true);
+    if (item.file === libraryFile) { libraryFile = null; setDirty(true); save(); }
     openLibrary();
   } catch (err) { alert('Delete failed. ' + err.message); }
 }
@@ -527,7 +556,8 @@ async function openLibrary() {
         ...fileBtn('Import project JSON', 'application/json,.json', importProject),
         el('button', { class: 'btn', onclick: exportProjectJson }, 'Export project JSON'),
         el('a', { class: 'btn btn-link', href: '../../examples/template.xlsx', download: '' }, 'Download Excel template'))),
-    el('div', { class: 'card' }, el('h3', {}, 'Saved quizzes'), listEl)));
+    el('div', { class: 'card' }, el('h3', {}, 'Saved quizzes'),
+      el('p', { class: 'hint lib-dir' }, 'Every .json file in data/quizzes/'), listEl)));
 
   let items;
   try { items = (await api('/api/assessments')).assessments; }
@@ -535,17 +565,20 @@ async function openLibrary() {
   if (view !== 'library') return;
   if (!items.length) { listEl.replaceChildren(el('p', { class: 'hint' }, 'No saved quizzes yet. Use Save in the top bar to add the current quiz.')); return; }
   listEl.replaceChildren(el('ul', { class: 'lib-items' }, items.map((it) => {
-    const current = it.id === model.id;
+    const current = it.file === libraryFile;
     const n = it.questionCount;
-    const updated = it.updatedAt ? new Date(it.updatedAt).toLocaleString() : '';
-    return el('li', { class: 'lib-item' + (current ? ' current' : '') },
+    const modified = new Date(it.modifiedAt).toLocaleString();
+    const meta = it.error ? [it.error] : [`v${it.version || '1.0'}`, `${n} question${n === 1 ? '' : 's'}`,
+      `pass ${it.passingPercent}%`, `saved ${modified}`];
+    return el('li', { class: 'lib-item' + (current ? ' current' : '') + (it.error ? ' broken' : '') },
       el('div', { class: 'lib-item-main' },
-        el('div', { class: 'lib-name' }, it.title || 'Untitled', current ? el('span', { class: 'badge', style: 'margin-left:8px' }, dirty ? 'Open, unsaved changes' : 'Open') : null),
-        el('div', { class: 'lib-meta' }, [`v${it.version || '1.0'}`, `${n} question${n === 1 ? '' : 's'}`,
-          `pass ${it.passingPercent}%`, updated && `saved ${updated}`].filter(Boolean).join(' \u00b7 '))),
+        el('div', { class: 'lib-name' }, it.title || (it.error ? it.file : 'Untitled'),
+          current ? el('span', { class: 'badge', style: 'margin-left:8px' }, dirty ? 'Open, unsaved changes' : 'Open') : null),
+        el('div', { class: 'lib-file' }, `${it.file}.json`),
+        el('div', { class: 'lib-meta' }, meta.join(' \u00b7 '))),
       el('div', { class: 'lib-item-actions' },
-        el('button', { class: 'btn btn-small', onclick: () => openFromLibrary(it.id) }, 'Open'),
-        el('button', { class: 'btn btn-small btn-danger', 'aria-label': `Delete ${it.title}`, onclick: () => deleteFromLibrary(it) }, 'Delete')));
+        it.error ? null : el('button', { class: 'btn btn-small', onclick: () => openFromLibrary(it.file) }, 'Open'),
+        el('button', { class: 'btn btn-small btn-danger', 'aria-label': `Delete ${it.file}.json`, onclick: () => deleteFromLibrary(it) }, 'Delete')));
   })));
 }
 
@@ -557,6 +590,7 @@ async function showVersion() {
 $('#btn-add').addEventListener('click', () => { const q = newQuestion($('#add-kind').value); model.questions.push(q); activeId = q.id; touch(); render(); });
 $('#btn-library').addEventListener('click', openLibrary);
 $('#btn-save').addEventListener('click', saveToLibrary);
+$('#btn-save-as').addEventListener('click', saveAsCopy);
 document.addEventListener('keydown', (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') { e.preventDefault(); saveToLibrary(); }
 });
