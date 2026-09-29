@@ -54,6 +54,9 @@ already vendored under `node_modules`.
   interaction; box-style questions import from Excel.
 - **Preview this question**: preview just the question you are editing, from the
   question editor.
+- **Drag to reorder**: learners can drag sequence items into order, and authors
+  can drag questions to reorder the question list. The up/down arrows remain as
+  the keyboard alternative, and touch drags use a grip so lists still scroll.
 
 ## New in 1.2.0
 

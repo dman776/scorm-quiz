@@ -38,7 +38,7 @@ export async function buildScormPackage(opts) {
   const files = [];
   const add = (p, content) => { const sp = safeZipPath(p); zip.file(sp, content); files.push(sp); };
 
-  const runtimeFiles = ['player.js', 'adapter.js', 'interactions.js', 'state.js', 'dragdrop.js'];
+  const runtimeFiles = ['player.js', 'adapter.js', 'interactions.js', 'state.js', 'dragdrop.js', 'sortable.js'];
   for (const f of runtimeFiles) add(`runtime/scorm-runtime/src/${f}`, fs.readFileSync(path.join(RUNTIME_DIR, f), 'utf8'));
   const engineFiles = ['scoring.js', 'types.js'];
   for (const f of engineFiles) add(`runtime/engine/src/${f}`, fs.readFileSync(path.join(ENGINE_DIR, f), 'utf8'));

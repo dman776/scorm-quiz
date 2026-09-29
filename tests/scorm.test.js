@@ -8,6 +8,7 @@ import { serializeState, deserializeState, validateStateSize, seededShuffle } fr
 import { generateManifest, xmlEscape, manifestId } from '../packages/export-service/src/manifest.js';
 import { ScormAdapter } from '../packages/scorm-runtime/src/adapter.js';
 import { MockLMS } from '../packages/mock-lms/mock-lms.js';
+import { moveIndex } from '../packages/scorm-runtime/src/sortable.js';
 import { QUESTION_KINDS } from '../packages/engine/src/types.js';
 
 test('choice response patterns join with [,]', () => {
@@ -140,4 +141,11 @@ test('strict mock LMS rejects gaps, missing dependencies and bad patterns', () =
 test('interaction index map survives suspend/resume', () => {
   const st = { order: ['a'], answers: {}, flagged: [], index: 0, submitted: false, attempt: 1, remainingTime: null, answerOrder: null, interactionIndex: { a: 0 } };
   assert.deepEqual(deserializeState(serializeState(st)).interactionIndex, { a: 0 });
+});
+
+test('moveIndex moves one element without mutating the input', () => {
+  const a = ['a', 'b', 'c', 'd'];
+  assert.deepEqual(moveIndex(a, 3, 0), ['d', 'a', 'b', 'c']);
+  assert.deepEqual(moveIndex(a, 0, 2), ['b', 'c', 'a', 'd']);
+  assert.deepEqual(a, ['a', 'b', 'c', 'd']);
 });

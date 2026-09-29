@@ -8,6 +8,7 @@ import { QUESTION_KINDS, PRESENTATION } from '../../engine/src/types.js';
 import { ScormAdapter } from './adapter.js';
 import { buildInteraction } from './interactions.js';
 import { renderDragDrop } from './dragdrop.js';
+import { makeSortable, moveIndex } from './sortable.js';
 import { serializeState, deserializeState, validateStateSize, seededShuffle } from './state.js';
 
 const h = (tag, attrs = {}, ...kids) => {
@@ -116,7 +117,8 @@ export class AssessmentPlayer {
     const qs = this.questions;
     const idx = this.state.index;
     const q = qs[idx];
-    this.questionStart = Date.now();
+    // Re-renders of the same question (reordering, flagging) keep its timer running.
+    if (this._shownQuestionId !== q.id) { this.questionStart = Date.now(); this._shownQuestionId = q.id; }
     const screen = h('div', { class: 'sqb-screen' });
     screen.append(h('div', { class: 'sqb-progress' }, `Question ${idx + 1} of ${qs.length}`));
     const fs = h('fieldset', { class: 'sqb-question' });
@@ -190,7 +192,9 @@ export class AssessmentPlayer {
         const list = h('ol', { class: 'sqb-seq' });
         const labelOf = Object.fromEntries(q.items.map((i) => [i.id, i.label]));
         cur.forEach((id, i) => {
-          const li = h('li', { class: 'sqb-seq-item' }, h('span', {}, labelOf[id]),
+          const li = h('li', { class: 'sqb-seq-item', 'data-seq-id': id },
+            h('span', { class: 'sqb-seq-grip', 'aria-hidden': 'true', title: 'Drag to reorder' }, '\u2807\u2807'),
+            h('span', { class: 'sqb-seq-label' }, labelOf[id]),
             h('span', { class: 'sqb-seq-btns' },
               h('button', { type: 'button', class: 'sqb-btn sqb-mini', 'aria-label': `Move ${labelOf[id]} up`,
                 disabled: i === 0, onclick: () => this._moveSeq(q, cur, i, -1) }, '\u2191'),
@@ -199,7 +203,10 @@ export class AssessmentPlayer {
           list.append(li);
         });
         if (!Array.isArray(val)) this.state.answers[q.id] = cur.slice();
+        makeSortable(list, { itemSelector: '.sqb-seq-item', handleSelector: '.sqb-seq-grip',
+          onReorder: (from, to) => this._placeSeq(q, moveIndex(cur, from, to), cur[from], null) });
         wrap.append(list);
+        wrap.append(h('p', { class: 'sqb-seq-hint' }, 'Drag the items into order, or use the arrow buttons.'));
         break;
       }
       case QUESTION_KINDS.NUMERIC: {
@@ -252,9 +259,21 @@ export class AssessmentPlayer {
   _moveSeq(q, cur, i, dir) {
     const j = i + dir;
     if (j < 0 || j >= cur.length) return;
-    [cur[i], cur[j]] = [cur[j], cur[i]];
-    this._answer(q.id, cur.slice());
+    this._placeSeq(q, moveIndex(cur, i, j), cur[i], dir < 0 ? 'up' : 'down');
+  }
+  /** Save a new sequence order, announce it, and keep focus on the moved item. */
+  _placeSeq(q, order, movedId, dir) {
+    this._answer(q.id, order);
     this._renderQuestion();
+    const label = (q.items.find((it) => it.id === movedId) || {}).label || '';
+    const pos = order.indexOf(movedId);
+    this._announce(`${label} moved to position ${pos + 1} of ${order.length}.`);
+    const li = this.root.querySelector(`.sqb-seq-item[data-seq-id="${String(movedId).replace(/["\\]/g, '\\$&')}"]`);
+    if (!li) return;
+    // Stay on the same arrow if it still works, else the other one.
+    const [up, down] = li.querySelectorAll('.sqb-seq-btns button');
+    const pick = dir === 'down' ? (down.disabled ? up : down) : dir === 'up' ? (up.disabled ? down : up) : (up.disabled ? down : up);
+    /** @type {HTMLElement} */ (pick).focus();
   }
   _pickHotspot(q, optionId) {
     if (!q.multiple) {

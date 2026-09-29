@@ -11,6 +11,7 @@ import { validateAssessment } from '../../../packages/export-service/src/validat
 import { AssessmentPlayer } from '../../../packages/scorm-runtime/src/player.js';
 import { MAX_HOTSPOT_IMAGE_BYTES } from '../../../packages/engine/src/types.js';
 import { MockLMS } from '../../../packages/mock-lms/mock-lms.js';
+import { makeSortable, moveIndex } from '../../../packages/scorm-runtime/src/sortable.js';
 
 // The server that serves this page also serves the API.
 const API = location.protocol.startsWith('http') ? '' : 'http://localhost:4000';
@@ -117,13 +118,20 @@ function renderList() {
   if (model.questions.length === 0) list.append(el('p', { class: 'empty' }, 'No questions yet. Add one above, or Import Excel.'));
   model.questions.forEach((q, i) => {
     const item = el('li', { class: 'q-item' + (q.id === activeId ? ' active' : ''), onclick: () => { activeId = q.id; render(); } },
-      el('div', {}, el('div', { class: 'q-kind' }, q.kind.replace('_', ' ')), el('div', { class: 'q-prompt' }, (q.prompt || '').slice(0, 40))),
+      el('span', { class: 'q-grip', 'aria-hidden': 'true', title: 'Drag to reorder' }, '\u2807\u2807'),
+      el('div', { class: 'q-main' }, el('div', { class: 'q-kind' }, q.kind.replace('_', ' ')), el('div', { class: 'q-prompt' }, (q.prompt || '').slice(0, 40))),
       el('div', { class: 'q-move' },
         el('button', { 'aria-label': 'Move up', disabled: i === 0, onclick: (e) => { e.stopPropagation(); move(i, -1); } }, '\u2191'),
         el('button', { 'aria-label': 'Move down', disabled: i === model.questions.length - 1, onclick: (e) => { e.stopPropagation(); move(i, 1); } }, '\u2193')));
     list.append(item);
   });
 }
+/** Drag a question to a new position (the arrows remain the keyboard way). */
+makeSortable(/** @type {HTMLElement} */ ($('#q-list')), {
+  itemSelector: '.q-item', handleSelector: '.q-grip', scrollEl: /** @type {HTMLElement} */ ($('.app-left')),
+  onReorder: (from, to) => { model.questions = moveIndex(model.questions, from, to); touch(); renderList(); },
+});
+
 function move(i, d) {
   const j = i + d;
   if (j < 0 || j >= model.questions.length) return;
@@ -203,15 +211,20 @@ function pairsEditor(q) {
   return wrap;
 }
 function sequenceEditor(q) {
-  const wrap = el('div', { class: 'field' }, el('label', {}, 'Sequence items (top = first)'));
+  const reorder = (from, to) => { q.correctOrder = moveIndex(q.correctOrder, from, to); touch(); renderEditor(); };
+  const rows = el('div', { class: 'seq-rows' });
   q.correctOrder.forEach((id, i) => {
     const item = q.items.find((x) => x.id === id);
-    wrap.append(el('div', { class: 'opt-row' },
-      el('input', { type: 'text', class: 'opt-label', value: item.label, placeholder: 'Item label', 'aria-label': 'Item label', oninput: (e) => { item.label = e.target.value; touch(); } }),
-      el('button', { 'aria-label': 'Up', disabled: i === 0, onclick: () => { [q.correctOrder[i], q.correctOrder[i - 1]] = [q.correctOrder[i - 1], q.correctOrder[i]]; touch(); renderEditor(); } }, '\u2191'),
-      el('button', { 'aria-label': 'Down', disabled: i === q.correctOrder.length - 1, onclick: () => { [q.correctOrder[i], q.correctOrder[i + 1]] = [q.correctOrder[i + 1], q.correctOrder[i]]; touch(); renderEditor(); } }, '\u2193')));
+    const name = () => item.label || `item ${i + 1}`;
+    rows.append(el('div', { class: 'opt-row seq-row' },
+      el('span', { class: 'q-grip', 'aria-hidden': 'true', title: 'Drag to reorder' }, '\u2807\u2807'),
+      el('input', { type: 'text', class: 'opt-label', value: item.label, placeholder: 'Item label', 'aria-label': `Item ${i + 1} label`, oninput: (e) => { item.label = e.target.value; touch(); } }),
+      el('button', { 'aria-label': `Move ${name()} up`, disabled: i === 0, onclick: () => reorder(i, i - 1) }, '\u2191'),
+      el('button', { 'aria-label': `Move ${name()} down`, disabled: i === q.correctOrder.length - 1, onclick: () => reorder(i, i + 1) }, '\u2193')));
   });
-  return wrap;
+  // Drag by the grip or the row edge; presses inside the text field still edit it.
+  makeSortable(rows, { itemSelector: '.seq-row', handleSelector: '.q-grip', onReorder: reorder });
+  return el('div', { class: 'field' }, el('label', {}, 'Sequence items (top = first, drag or use the arrows to reorder)'), rows);
 }
 function numericEditor(q) {
   return el('div', { class: 'row-2' },

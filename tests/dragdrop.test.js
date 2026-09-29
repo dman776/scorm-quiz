@@ -101,6 +101,7 @@ test('package ships the drag-and-drop runtime; answer key lists placements', asy
   const { zip } = await buildScormPackage({ assessment: a });
   const files = Object.keys((await JSZip.loadAsync(zip)).files);
   assert.ok(files.includes('runtime/scorm-runtime/src/dragdrop.js'));
+  assert.ok(files.includes('runtime/scorm-runtime/src/sortable.js'));
   assert.match(buildAnswerKey(a), /Router -> Network layer; .*Layer 3 switch -> Network layer or Data link layer; Hub -> \(distractor/);
 });
 

@@ -33,6 +33,12 @@ body { margin: 0; font-family: var(--font); color: var(--ink); background: var(-
 .q-item .q-kind { font-size: .72rem; color: var(--muted); text-transform: uppercase; }
 .q-item .q-prompt { font-size: .85rem; }
 .q-move { display: flex; gap: 4px; }
+.q-item { user-select: none; -webkit-user-select: none; }
+.q-item .q-main { flex: 1 1 auto; min-width: 0; }
+.seq-row { cursor: grab; border-radius: 8px; }
+.seq-row input { cursor: text; }
+.seq-row.sort-ghost { padding: 4px 6px; }
+.q-grip { color: var(--muted); letter-spacing: -3px; padding: 4px 6px 4px 0; cursor: grab; touch-action: none; flex: none; }
 .q-move button { border: 1px solid var(--border); background: #fff; border-radius: 6px; cursor: pointer; padding: 2px 7px; }
 .left-foot { margin-top: 16px; display: flex; flex-direction: column; gap: 14px; }
 .foot-group { display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
