@@ -38,8 +38,9 @@ npm run e2e:sim          # full attempt scored + reported through a mock LMS
 ```
 
 `npm start` serves the authoring UI at `/` and the learner preview at
-`/preview.html`. Set `PORT` to change the port and `SQB_DATA_DIR` to keep the
-library somewhere other than `apps/server/data/`.
+`/preview.html`. The library is one JSON file per quiz in `data/quizzes/`. Set
+`PORT` to change the port, and `SQB_DATA_DIR` to move the data root (quizzes then
+live in `$SQB_DATA_DIR/quizzes/`).
 
 Only runtime deps are `jszip` (packaging + xlsx parsing) and `nanoid` (ids),
 already vendored under `node_modules`.

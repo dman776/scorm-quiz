@@ -15,19 +15,21 @@ import { importXlsx } from '../../../packages/export-service/src/xlsx-import.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '../../..');
-const DATA_DIR = path.resolve(process.env.SQB_DATA_DIR || path.join(__dirname, '../data'));
+/** Data root (override with SQB_DATA_DIR); the library is one JSON file per quiz. */
+const DATA_DIR = path.resolve(process.env.SQB_DATA_DIR || path.join(ROOT, 'data'));
+const QUIZ_DIR = path.join(DATA_DIR, 'quizzes');
 /** App version, from the root package.json: the single source of truth. */
 const APP_VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
-fs.mkdirSync(DATA_DIR, { recursive: true });
+fs.mkdirSync(QUIZ_DIR, { recursive: true });
 const PORT = Number(process.env.PORT || 4000);
 const MAX_BODY = 8 * 1024 * 1024; // 8MB (xlsx uploads)
 
 const store = {
-  file: (id) => path.join(DATA_DIR, `${String(id).replace(/[^A-Za-z0-9_-]/g, '')}.json`),
+  file: (id) => path.join(QUIZ_DIR, `${String(id).replace(/[^A-Za-z0-9_-]/g, '')}.json`),
   list() {
     const out = [];
-    for (const f of fs.readdirSync(DATA_DIR).filter((f) => f.endsWith('.json') && !f.startsWith('_'))) {
-      try { out.push(JSON.parse(fs.readFileSync(path.join(DATA_DIR, f), 'utf8'))); } catch (_e) { /* skip corrupt */ }
+    for (const f of fs.readdirSync(QUIZ_DIR).filter((f) => f.endsWith('.json') && !f.startsWith('_'))) {
+      try { out.push(JSON.parse(fs.readFileSync(path.join(QUIZ_DIR, f), 'utf8'))); } catch (_e) { /* skip corrupt */ }
     }
     return out.sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
   },

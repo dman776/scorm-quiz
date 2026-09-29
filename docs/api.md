@@ -3,7 +3,8 @@
 Base URL: `http://localhost:4000` (set `PORT` to change). JSON bodies unless noted.
 The same server serves the authoring UI (`/` redirects to `/apps/web/index.html`)
 and the shared packages it imports; nothing else in the repo is served. Saved
-assessments are JSON files in `apps/server/data/` (override with `SQB_DATA_DIR`).
+assessments are JSON files in `data/quizzes/`, one per quiz, named by id (set
+`SQB_DATA_DIR` to move the `data/` root).
 
 | Method | Path | Purpose | Body | Response |
 | --- | --- | --- | --- | --- |
@@ -47,4 +48,4 @@ workbook format.
 
 - Bodies capped at 8 MB (raised from 5 MB to accommodate xlsx uploads).
 - No `eval`; JSON parsed in try/catch; storage ids sanitized (no path traversal).
-- Successful exports append to `apps/server/data/_export-audit.log`.
+- Successful exports append to `data/_export-audit.log`.
