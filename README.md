@@ -45,6 +45,17 @@ live in `$SQB_DATA_DIR/quizzes/`).
 Only runtime deps are `jszip` (packaging + xlsx parsing) and `nanoid` (ids),
 already vendored under `node_modules`.
 
+## New in 1.4.0
+
+- **Drag to reorder**: learners can drag sequence items into order; authors can
+  drag questions to reorder the question list and drag a sequence question's
+  items to set its correct order. The up/down arrows remain as the keyboard
+  alternative, touch drags use a grip so lists still scroll, and Escape cancels.
+- Arrow moves in a sequence question keep focus on the moved item and announce
+  its new position to screen readers.
+- Fix: the time spent per question sent to the LMS (latency) no longer resets
+  when a question re-renders (reordering, hotspot picks, flagging).
+
 ## New in 1.3.0
 
 - **Drag and drop question type**: learners place items into labeled boxes or
@@ -54,9 +65,6 @@ already vendored under `node_modules`.
   interaction; box-style questions import from Excel.
 - **Preview this question**: preview just the question you are editing, from the
   question editor.
-- **Drag to reorder**: learners can drag sequence items into order, and authors
-  can drag questions to reorder the question list. The up/down arrows remain as
-  the keyboard alternative, and touch drags use a grip so lists still scroll.
 
 ## New in 1.2.0
 
