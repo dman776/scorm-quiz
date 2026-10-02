@@ -12,6 +12,7 @@ import { AssessmentPlayer } from '../../../packages/scorm-runtime/src/player.js'
 import { MAX_HOTSPOT_IMAGE_BYTES } from '../../../packages/engine/src/types.js';
 import { MockLMS } from '../../../packages/mock-lms/mock-lms.js';
 import { makeSortable, moveIndex } from '../../../packages/scorm-runtime/src/sortable.js';
+import { blankQuestion, convertQuestion } from './convert-question.js';
 
 // The server that serves this page also serves the API.
 const API = location.protocol.startsWith('http') ? '' : 'http://localhost:4000';
@@ -19,21 +20,6 @@ const SERVER_DOWN = 'Could not reach the server. Start it with: npm start';
 const ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
 const nanoid = (n = 6) => Array.from({ length: n }, () => ALPHABET[(Math.random() * ALPHABET.length) | 0]).join('');
 const uid = (p) => `${p}-${nanoid(6)}`;
-
-const KIND_PRESET = {
-  single_select: { kind: 'single_select', presentation: 'radio' },
-  single_select_pill: { kind: 'single_select', presentation: 'single_pill' },
-  multiple_select: { kind: 'multiple_select', presentation: 'checkbox', scoringStrategy: 'all_or_nothing' },
-  multiple_select_pill: { kind: 'multiple_select', presentation: 'multi_pill', scoringStrategy: 'partial' },
-  true_false: { kind: 'true_false' },
-  single_checkbox: { kind: 'single_checkbox' },
-  matching: { kind: 'matching', scoringStrategy: 'partial' },
-  sequence: { kind: 'sequence', scoringStrategy: 'all_or_nothing' },
-  numeric: { kind: 'numeric' },
-  short_answer: { kind: 'short_answer' },
-  hotspot: { kind: 'hotspot', multiple: false, scoringStrategy: 'all_or_nothing' },
-  drag_drop: { kind: 'drag_drop', scoringStrategy: 'partial' },
-};
 
 const draft = load();
 let model = draft || blankQuiz();
@@ -92,25 +78,8 @@ function el(tag, attrs = {}, ...kids) {
   for (const kid of kids.flat()) if (kid != null && kid !== false) n.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
   return n;
 }
-function newQuestion(presetKey) {
-  const base = { id: uid('q'), points: 1, prompt: 'New question', objective: '', section: '',
-    correctFeedback: '', incorrectFeedback: '', rationale: '', status: 'draft', ...KIND_PRESET[presetKey] };
-  if (['single_select', 'multiple_select'].includes(base.kind))
-    base.options = [{ id: 'a', label: 'Option A', correct: true }, { id: 'b', label: 'Option B' }, { id: 'c', label: 'Option C' }, { id: 'd', label: 'Option D' }];
-  else if (base.kind === 'true_false') base.options = [{ id: 'true', label: 'True', correct: true }, { id: 'false', label: 'False' }];
-  else if (base.kind === 'single_checkbox') base.options = [{ id: 'ack', label: 'I acknowledge the statement is true', correct: true }];
-  else if (base.kind === 'matching') base.pairs = [{ prompt: 'Term 1', match: 'Def 1' }, { prompt: 'Term 2', match: 'Def 2' }];
-  else if (base.kind === 'sequence') { base.items = [{ id: 's1', label: 'First' }, { id: 's2', label: 'Second' }, { id: 's3', label: 'Third' }]; base.correctOrder = ['s1', 's2', 's3']; }
-  else if (base.kind === 'numeric') { base.exact = 0; base.tolerance = 0; base.units = ''; }
-  else if (base.kind === 'short_answer') { base.accepted = ['answer']; base.caseSensitive = false; }
-  else if (base.kind === 'hotspot') { base.image = { src: '', alt: '' }; base.options = []; }
-  else if (base.kind === 'drag_drop') {
-    base.image = null;
-    base.zones = [{ id: 'z1', label: 'Zone A' }, { id: 'z2', label: 'Zone B' }];
-    base.items = [{ id: 'i1', label: 'Item 1', zones: ['z1'] }, { id: 'i2', label: 'Item 2', zones: ['z2'] }];
-  }
-  return base;
-}
+
+function newQuestion(presetKey) { return blankQuestion(presetKey, uid('q')); }
 
 function renderList() {
   const list = $('#q-list');
@@ -154,7 +123,7 @@ function renderEditor() {
   const q = model.questions.find((x) => x.id === activeId);
   if (!q) { c.append(el('p', { class: 'empty' }, 'Select or add a question to begin editing.')); return; }
   c.append(el('div', { class: 'editor-head' }, el('h2', {}, 'Edit question'),
-    el('span', { class: 'inline' }, el('span', { class: 'badge' }, q.kind.replace('_', ' ')),
+    el('span', { class: 'inline' }, typePicker(q),
       el('button', { class: 'btn', title: 'Try just this question as a learner', onclick: () => openPreview(q) }, 'Preview this question'),
       el('button', { class: 'btn', onclick: () => duplicate(q) }, 'Duplicate'),
       el('button', { class: 'btn', onclick: () => remove(q) }, 'Delete'))));
@@ -181,6 +150,29 @@ function renderEditor() {
     field('Correct feedback', textArea(q.correctFeedback, (v) => { q.correctFeedback = v; touch(); })),
     field('Incorrect feedback', textArea(q.incorrectFeedback, (v) => { q.incorrectFeedback = v; touch(); }))));
   c.append(field('Rationale', textArea(q.rationale, (v) => { q.rationale = v; touch(); })));
+}
+
+/** The KIND_PRESET key a question currently matches. */
+function presetKeyOf(q) {
+  if (q.kind === 'single_select' && q.presentation === 'single_pill') return 'single_select_pill';
+  if (q.kind === 'multiple_select' && q.presentation === 'multi_pill') return 'multiple_select_pill';
+  return q.kind;
+}
+/** Question type dropdown (same choices as the Add menu); changing it converts the question. */
+function typePicker(q) {
+  const current = presetKeyOf(q);
+  const options = [...$('#add-kind').options].map((o) => el('option', { value: o.value, selected: o.value === current }, o.textContent));
+  return el('select', { class: 'control type-picker', 'aria-label': 'Question type', title: 'Change the question type',
+    onchange: (e) => changeType(q, e.target.value) }, ...options);
+}
+function changeType(q, presetKey) {
+  const { question, dropped } = convertQuestion(q, presetKey);
+  if (dropped.length && !confirm(`Changing the type will keep what it can, but this will be lost:\n\n- ${dropped.join('\n- ')}\n\nChange the type?`)) {
+    renderEditor();
+    return;
+  }
+  model.questions[model.questions.indexOf(q)] = question;
+  touch(); render();
 }
 
 function optionsEditor(q) {

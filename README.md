@@ -45,6 +45,15 @@ live in `$SQB_DATA_DIR/quizzes/`).
 Only runtime deps are `jszip` (packaging + xlsx parsing) and `nanoid` (ids),
 already vendored under `node_modules`.
 
+## New in 1.5.0
+
+- **Change a question's type**: the type menu in the question editor converts a
+  question to another type, keeping the prompt, points, feedback and as much of
+  the answers as the new type can hold (options become sequence items or
+  accepted answers, matching pairs become drop zones, a hotspot's image and
+  regions become drag-and-drop zones, and so on). If anything would be lost, the
+  editor lists it and asks before converting.
+
 ## New in 1.4.0
 
 - **Drag to reorder**: learners can drag sequence items into order; authors can
