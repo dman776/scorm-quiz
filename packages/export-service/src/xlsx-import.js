@@ -23,6 +23,9 @@
  *   drag_drop       : "Router=Network | Switch=Data Link | Hub="   (item=zone)
  *       - zones are created in order of first appearance, as labeled boxes
  *       - "Item=Zone A ; Zone B" accepts either zone
+ *       - "Item=Zone A + Zone B" must be placed in both; any " + " (with
+ *         spaces, so "C++" stays a label) lets the question's items go in
+ *         several zones, and then every listed zone (";" or "+") is required
  *       - "Hub=" (nothing after =) makes a distractor that belongs nowhere
  *       - "=Session" (nothing before =) adds a zone with no correct item
  *       - "[n]" after a zone sets its capacity: "Router=Network[1]"
@@ -199,7 +202,7 @@ function parseChoiceOptions(cell) {
   });
 }
 
-/** Parse a drag_drop Options cell ("Item=Zone ; Zone | Distractor= | =Empty zone"). */
+/** Parse a drag_drop Options cell ("Item=Zone ; Zone | Item=Zone + Zone | Distractor= | =Empty zone"). */
 function parseDragDrop(cell) {
   const zones = [];
   const zoneFor = (raw) => {
@@ -214,13 +217,15 @@ function parseDragDrop(cell) {
     return z.id;
   };
   const items = [];
+  let reuseItems = false;
   for (const token of String(cell).split('|').map((t) => t.trim()).filter(Boolean)) {
     const eq = token.indexOf('=');
     const label = (eq < 0 ? token : token.slice(0, eq)).trim();
-    const zoneIds = eq < 0 ? [] : token.slice(eq + 1).split(';').map(zoneFor).filter(Boolean);
+    const zoneIds = eq < 0 ? [] : token.slice(eq + 1).split(/;|\s\+\s/).map(zoneFor).filter(Boolean);
+    if (eq >= 0 && /\s\+\s/.test(token.slice(eq + 1))) reuseItems = true;
     if (label) items.push({ id: `i${items.length + 1}`, label, zones: [...new Set(zoneIds)] });
   }
-  return { zones, items };
+  return reuseItems ? { zones, items, reuseItems } : { zones, items };
 }
 
 const TYPE_ALIASES = {

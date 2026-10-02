@@ -144,7 +144,7 @@ function renderEditor() {
       (v) => { q.scoringStrategy = v; touch(); })));
   if (q.kind === 'drag_drop')
     c.append(field('Scoring strategy', selectInput(q.scoringStrategy || 'partial',
-      [['partial', 'Partial credit (per item; a placed distractor cancels one)'], ['all_or_nothing', 'All or nothing']],
+      [['partial', q.reuseItems ? 'Partial credit (per placement; a wrong placement cancels one)' : 'Partial credit (per item; a placed distractor cancels one)'], ['all_or_nothing', 'All or nothing']],
       (v) => { q.scoringStrategy = v; touch(); })));
   c.append(el('div', { class: 'row-2' },
     field('Correct feedback', textArea(q.correctFeedback, (v) => { q.correctFeedback = v; touch(); })),
@@ -404,6 +404,12 @@ function dragDropEditor(q) {
 
   // Items.
   wrap.append(el('label', { class: 'dd-sub' }, 'Items to drag'));
+  wrap.append(el('label', { class: 'inline' },
+    el('input', { type: 'checkbox', checked: !!q.reuseItems, onchange: (e) => {
+      if (e.target.checked) q.reuseItems = true; else delete q.reuseItems;
+      rerender();
+    } }),
+    ' Items can be placed in more than one zone (each item must be in every zone ticked for it)'));
   q.items.forEach((it, i) => {
     it.zones = it.zones || [];
     wrap.append(el('div', { class: 'dd-item-row' },
@@ -412,7 +418,7 @@ function dragDropEditor(q) {
           'aria-label': `Item ${i + 1} text`, oninput: (e) => { it.label = e.target.value; touch(); } }),
         el('button', { class: 'del', 'aria-label': `Remove item ${i + 1}`, onclick: () => { q.items = q.items.filter((x) => x !== it); rerender(); } }, '\u00d7')),
       el('div', { class: 'dd-accepts', role: 'group', 'aria-label': `Zones that accept item ${i + 1}` },
-        el('span', { class: 'hint' }, 'Correct in:'),
+        el('span', { class: 'hint' }, q.reuseItems ? 'Must be in:' : 'Correct in:'),
         ...q.zones.map((z, zi) => el('label', { class: 'inline dd-zone-check' },
           el('input', { type: 'checkbox', checked: it.zones.includes(z.id), onchange: (e) => {
             it.zones = e.target.checked ? [...new Set([...it.zones, z.id])] : it.zones.filter((zid) => zid !== z.id);
@@ -420,7 +426,9 @@ function dragDropEditor(q) {
           } }), ` ${zi + 1}. ${z.label || '(unnamed)'}`)),
         it.zones.length ? null : el('span', { class: 'badge' }, 'Distractor'))));
   });
-  wrap.append(el('p', { class: 'hint' }, 'Tick every zone where an item counts as correct. An item with no zones ticked is a distractor: it is correct to leave it in the bank.'));
+  wrap.append(el('p', { class: 'hint' }, q.reuseItems
+    ? 'Tick every zone the item belongs in; the learner must place it in all of them. For partial credit, each placement in a zone it does not belong in cancels one correct placement. An item with no zones ticked is a distractor.'
+    : 'Tick every zone where an item counts as correct (any one of them will do). An item with no zones ticked is a distractor: it is correct to leave it in the bank.'));
   wrap.append(el('button', { class: 'btn', onclick: () => {
     let n = q.items.length + 1; while (q.items.some((x) => x.id === `i${n}`)) n++;
     q.items.push({ id: `i${n}`, label: `Item ${q.items.length + 1}`, zones: [] }); rerender();

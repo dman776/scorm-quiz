@@ -73,7 +73,7 @@ export function buildAnswerKey(a) {
     out += `${i + 1}. [${q.kind}] ${q.prompt}\n`;
     if (q.kind === 'drag_drop') {
       const zoneLabel = Object.fromEntries((q.zones || []).map((z) => [z.id, z.label]));
-      out += `   Placements: ${(q.items || []).map((it) => `${it.label} -> ${(it.zones || []).map((z) => zoneLabel[z]).join(' or ') || '(distractor, leave unplaced)'}`).join('; ')}\n`;
+      out += `   Placements: ${(q.items || []).map((it) => `${it.label} -> ${(it.zones || []).map((z) => zoneLabel[z]).join(q.reuseItems ? ' and ' : ' or ') || '(distractor, leave unplaced)'}`).join('; ')}\n`;
     } else if (q.options) {
       const correct = q.options.filter((o) => o.correct).map((o) => o.label);
       out += `   Correct: ${correct.join('; ') || '(score-based)'}\n`;

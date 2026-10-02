@@ -105,4 +105,55 @@ test('package ships the drag-and-drop runtime; answer key lists placements', asy
   assert.match(buildAnswerKey(a), /Router -> Network layer; .*Layer 3 switch -> Network layer or Data link layer; Hub -> \(distractor/);
 });
 
+/* Reused items: an item can sit in several zones and must be in all of its zones. */
+const reuse = (over = {}) => dd({ reuseItems: true,
+  items: [
+    { id: 'i1', label: 'Router', zones: ['z1'] },
+    { id: 'i3', label: 'Layer 3 switch', zones: ['z1', 'z2'] },
+    { id: 'i4', label: 'Hub', zones: [] }, // distractor
+  ], ...over });
+
+test('reused items: every required zone filled and nothing extra is correct', () => {
+  const r = scoreQuestion(reuse(), { i1: ['z1'], i3: ['z1', 'z2'] });
+  assert.equal(r.outcome, 'correct'); assert.equal(r.score, 4);
+});
+test('reused items: partial credit per placement; wrong placements cancel one each', () => {
+  // 3 required placements; only one of the switch's two zones.
+  assert.equal(scoreQuestion(reuse(), { i1: ['z1'], i3: ['z2'] }).score, round(4 * 2 / 3));
+  // Everything everywhere: 3 right, 2 wrong (Router in z2, Hub in z1).
+  const r = scoreQuestion(reuse(), { i1: ['z1', 'z2'], i3: ['z1', 'z2'], i4: ['z1'] });
+  assert.equal(r.outcome, 'partial'); assert.equal(r.score, round(4 * 1 / 3));
+  assert.equal(scoreQuestion(reuse({ scoringStrategy: 'all_or_nothing' }), { i1: ['z1'], i3: ['z1'] }).score, 0);
+  assert.equal(scoreQuestion(reuse(), { i1: [] }).answered, false);
+  assert.equal(scoreQuestion(reuse(), { i1: 'z1', i3: ['z1', 'z2'] }).outcome, 'correct', 'a single zone id is read too');
+});
+test('reused items: SCORM pattern lists every placement and every required pair', () => {
+  const q = reuse();
+  const p = buildResponsePatterns(q, { i1: ['z1'], i3: ['z1', 'z2'] });
+  assert.equal(p.learner, 'Router[.]Network_layer[,]Layer_3_switch[.]Network_layer[,]Layer_3_switch[.]Data_link_layer');
+  assert.equal(p.correct, p.learner);
+  const lms = new MockLMS();
+  const adapter = new ScormAdapter({ api: lms });
+  adapter.initialize();
+  adapter.writeInteraction(0, buildInteraction(q, { i3: ['z2'] }, scoreQuestion(q, { i3: ['z2'] })));
+  assert.deepEqual(lms.errors, []);
+});
+test('reused items: each zone must have room for every item that belongs in it', () => {
+  const codes = (q) => validateAssessment({ title: 't', questions: [q] }).errors.map((e) => e.code);
+  const zones = [{ id: 'z1', label: 'A', capacity: 1 }, { id: 'z2', label: 'B' }];
+  assert.ok(codes(reuse({ zones })).includes('DD_CAPACITY'), 'Router and the switch both belong in A');
+  assert.deepEqual(codes(reuse({ zones: [{ id: 'z1', label: 'A', capacity: 2 }, { id: 'z2', label: 'B', capacity: 1 }] })), []);
+});
+test('reused items: Excel " + " requires every zone; "C++" stays a label', () => {
+  const a = sheetsToAssessment({ sheets: { Questions: [['Type', 'Prompt', 'Options'],
+    ['dnd', 'Sort', 'Router=Network | L3 switch=Network + Data Link | Hub='],
+    ['dnd', 'Langs', 'Python=Scripting | Rust=C++ ; Systems']] } });
+  const [q, q2] = a.questions;
+  assert.equal(q.reuseItems, true);
+  assert.deepEqual(q.items.map((it) => it.zones), [['z1'], ['z1', 'z2'], []]);
+  assert.equal(q2.reuseItems, undefined);
+  assert.deepEqual(q2.zones.map((z) => z.label), ['Scripting', 'C++', 'Systems']);
+  assert.match(buildAnswerKey({ title: 't', questions: [q] }), /L3 switch -> Network and Data Link/);
+});
+
 function round(n) { return Math.round(n * 1e6) / 1e6; }

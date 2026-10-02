@@ -65,7 +65,14 @@ function checkDragDrop(q, errors, warnings, push) {
   const targets = items.filter((it) => (it.zones || []).length > 0);
   if (items.length && !targets.length)
     push(errors, 'NO_DD_CORRECT', `Question ${q.id} has no item with a correct zone (all are distractors).`, q.id);
-  else if (targets.length && !dragDropFits(targets.map((it) => ({ zones: it.zones.filter((zid) => zoneIds.has(zid)) })), zones))
+  else if (q.reuseItems) {
+    // Every item goes in all of its zones, so each zone must hold all its items.
+    for (const z of zones) {
+      const need = targets.filter((it) => it.zones.includes(z.id)).length;
+      if (z.capacity >= 1 && need > z.capacity)
+        push(errors, 'DD_CAPACITY', `Zone "${z.label}" in question ${q.id} holds ${z.capacity} but ${need} items belong in it.`, q.id);
+    }
+  } else if (targets.length && !dragDropFits(targets.map((it) => ({ zones: it.zones.filter((zid) => zoneIds.has(zid)) })), zones))
     push(errors, 'DD_CAPACITY', `Question ${q.id}: the zone capacities leave no room to place every item correctly.`, q.id);
   if (q.image && q.image.src) {
     checkImage(q, 'Drag-and-drop question', errors, warnings, push);

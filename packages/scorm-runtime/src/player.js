@@ -418,7 +418,7 @@ export class AssessmentPlayer {
 function dragDropKey(q) {
   const zoneLabel = Object.fromEntries((q.zones || []).map((z) => [z.id, z.label]));
   return h('ul', { class: 'sqb-review-key' }, (q.items || []).map((it) => h('li', {},
-    `${it.label}: ${(it.zones || []).map((z) => zoneLabel[z]).filter(Boolean).join(' or ') || 'leave unplaced'}`)));
+    `${it.label}: ${(it.zones || []).map((z) => zoneLabel[z]).filter(Boolean).join(q.reuseItems ? ' and ' : ' or ') || 'leave unplaced'}`)));
 }
 
 function isoDuration(sec) {

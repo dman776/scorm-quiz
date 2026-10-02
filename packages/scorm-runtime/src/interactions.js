@@ -6,7 +6,7 @@
  * ("Each_device_connects_to_a_central_switch"), not internal option ids ("a"),
  * so LMS interaction reports show what the learner actually picked.
  */
-import { SCORM_INTERACTION_TYPE, QUESTION_KINDS, choiceKindOf } from '../../engine/src/types.js';
+import { SCORM_INTERACTION_TYPE, QUESTION_KINDS, choiceKindOf, dragDropPlacements } from '../../engine/src/types.js';
 
 /** Longest readable identifier we derive from answer text. */
 const LABEL_ID_MAX = 64;
@@ -85,14 +85,15 @@ export function buildResponsePatterns(q, response) {
     }
     case QUESTION_KINDS.DRAG_DROP: {
       // item[.]zone pairs. The correct pattern lists each non-distractor item
-      // with its first accepted zone (one pattern; our engine judges the result).
+      // with its first accepted zone (one pattern; our engine judges the result),
+      // or with every zone it must be in when items are reused.
       const itemIds = responseIdentifiers(q.items);
       const zoneIds = responseIdentifiers(q.zones);
-      const map = response && typeof response === 'object' ? response : {};
-      const learner = (q.items || []).filter((it) => zoneIds[map[it.id]])
-        .map((it) => `${itemIds[it.id]}[.]${zoneIds[map[it.id]]}`).join('[,]');
-      const correct = (q.items || []).filter((it) => (it.zones || []).some((z) => zoneIds[z]))
-        .map((it) => `${itemIds[it.id]}[.]${zoneIds[it.zones.find((z) => zoneIds[z])]}`).join('[,]');
+      const learner = dragDropPlacements(q, response).map(([i, z]) => `${itemIds[i]}[.]${zoneIds[z]}`).join('[,]');
+      const correct = (q.items || []).flatMap((it) => {
+        const valid = (it.zones || []).filter((z) => zoneIds[z]);
+        return (q.reuseItems ? valid : valid.slice(0, 1)).map((z) => `${itemIds[it.id]}[.]${zoneIds[z]}`);
+      }).join('[,]');
       return { type, learner, correct };
     }
     case QUESTION_KINDS.SEQUENCE: {

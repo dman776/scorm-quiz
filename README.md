@@ -45,6 +45,13 @@ live in `$SQB_DATA_DIR/quizzes/`).
 Only runtime deps are `jszip` (packaging + xlsx parsing) and `nanoid` (ids),
 already vendored under `node_modules`.
 
+## New in 1.6.0
+
+- **Drag and drop: items in more than one zone**: tick "Items can be placed in
+  more than one zone" and an item can be dropped in several zones, counting as
+  right only when it is in every zone ticked for it. In Excel, write
+  `Item=Zone A + Zone B`.
+
 ## New in 1.5.0
 
 - **Change a question's type**: the type menu in the question editor converts a

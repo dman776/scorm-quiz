@@ -226,7 +226,12 @@
           Leave it blank for no limit; 1 gives classic "label the diagram".</li>
         <li>Add the <strong>items</strong> and tick every zone where each one is correct. An item with no zone ticked is a
           <strong>distractor</strong>: the right answer is to leave it in the item bank.</li>
-        <li>Pick <strong>Partial credit</strong> (each item counts; a placed distractor cancels one) or
+        <li>To let an item go in <strong>more than one zone</strong> (for example, a Layer 3 switch belongs in both the
+          Network and Data Link zones), tick <strong>Items can be placed in more than one zone</strong>. The item bank
+          then keeps every item, the learner can drop a copy in each zone, and an item counts as right only when it is
+          in <em>every</em> zone ticked for it (instead of any one of them).</li>
+        <li>Pick <strong>Partial credit</strong> (each item counts; a placed distractor cancels one. With items in more
+          than one zone, each required placement counts and each placement in a wrong zone cancels one) or
           <strong>All or nothing</strong>.</li>
       </ol>
       <p>Learners can drag with a mouse or finger, or click/tap an item and then click/tap a zone. With a keyboard:
@@ -333,7 +338,7 @@
         <tr><td>sequence</td><td><code>Physical &gt; Data Link &gt; Network</code></td><td>-</td></tr>
         <tr><td>numeric</td><td>(blank)</td><td>the value, e.g. <code>254</code></td></tr>
         <tr><td>short_answer</td><td>(blank)</td><td><code>NAT | Network Address Translation</code></td></tr>
-        <tr><td>drag_drop</td><td><code>Router=Network | Switch=Data Link | Repeater=</code> (<code>Item=A ; B</code> accepts either zone, <code>Item=</code> is a distractor, <code>Zone[2]</code> caps a zone)</td><td>-</td></tr>
+        <tr><td>drag_drop</td><td><code>Router=Network | Switch=Data Link | Repeater=</code> (<code>Item=A ; B</code> accepts either zone, <code>Item=A + B</code> must be in both, <code>Item=</code> is a distractor, <code>Zone[2]</code> caps a zone)</td><td>-</td></tr>
       </table>
       <ul class="tight">
         <li>A leading <code>*</code> marks a correct option.</li>

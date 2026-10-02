@@ -52,6 +52,25 @@ export function choiceKindOf(q) {
   return q.multiple ? QUESTION_KINDS.MULTIPLE_SELECT : QUESTION_KINDS.SINGLE_SELECT;
 }
 
+/**
+ * A drag-and-drop response as [itemId, zoneId] pairs, keeping only zones that
+ * exist (a zone deleted after the learner answered is ignored). The response
+ * is { itemId: zoneId }, or { itemId: [zoneId, ...] } when the question's
+ * `reuseItems` lets an item sit in several zones; either form is read.
+ * @returns {[string, string][]}
+ */
+export function dragDropPlacements(q, response) {
+  const map = response && typeof response === 'object' ? response : {};
+  const zoneIds = new Set((q.zones || []).map((z) => z.id));
+  /** @type {[string, string][]} */
+  const out = [];
+  for (const it of q.items || []) {
+    const v = map[it.id];
+    for (const zid of new Set(Array.isArray(v) ? v : [v])) if (zoneIds.has(zid)) out.push([it.id, zid]);
+  }
+  return out;
+}
+
 /** Scoring strategies. */
 export const SCORING_STRATEGY = Object.freeze({
   ALL_OR_NOTHING: 'all_or_nothing',

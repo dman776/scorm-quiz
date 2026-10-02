@@ -37,7 +37,7 @@ required, shuffleOptions.
 | numeric | exact+tolerance or min+max; precision, units |
 | short_answer | accepted[], caseSensitive |
 | hotspot | image={src,alt,width,height}, options[] each with rect, multiple, scoringStrategy |
-| drag_drop | zones[]={id,label,rect?,capacity?}, items[]={id,label,zones[]}, image (optional), scoringStrategy |
+| drag_drop | zones[]={id,label,rect?,capacity?}, items[]={id,label,zones[]}, image (optional), reuseItems, scoringStrategy |
 
 ### AnswerOption
 ```jsonc
@@ -96,7 +96,17 @@ snap into zones; where inside a zone never matters. Scoring: each non-distractor
 item is right if it sits in one of its zones; a placed distractor counts one
 against. `partial` = max x (right - placed distractors) / non-distractor items,
 floored at 0; `all_or_nothing` needs every item right and no distractor placed.
-`shuffleAnswers` shuffles the item bank. Validation requires labels, at least one
+`shuffleAnswers` shuffles the item bank.
+
+With `reuseItems: true`, an item can be placed in several zones (the bank keeps
+every item and each zone holds its own copy), and `zones` lists every zone the
+item must be in rather than alternatives. The response is
+`{ itemId: [zoneId, ...] }`. Scoring counts placements: each required
+item->zone pair is one unit and each placement that is not required cancels
+one, so `partial` = max x (right - wrong) / required pairs, floored at 0, and
+`all_or_nothing` needs every required pair and nothing else. The SCORM correct
+pattern lists every required pair. Validation checks that each zone's capacity
+holds every item that belongs in it. Validation requires labels, at least one
 non-distractor item, valid zone references, and that the capacities leave room for
 every item at once (checked by bipartite matching); in image mode every zone needs
 a valid, non-overlapping region.

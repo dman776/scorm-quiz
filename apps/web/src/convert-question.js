@@ -49,7 +49,7 @@ export function blankQuestion(presetKey, id) {
 /** Fields that belong to a particular kind; everything else is common. */
 const KIND_FIELDS = ['presentation', 'scoringStrategy', 'incorrectPenalty', 'allowNegative', 'options', 'pairs',
   'items', 'correctOrder', 'exact', 'tolerance', 'min', 'max', 'precision', 'units', 'accepted', 'caseSensitive',
-  'image', 'multiple', 'zones'];
+  'image', 'multiple', 'zones', 'reuseItems'];
 
 /** Kinds whose scoringStrategy is chosen by the author, and which strategies each allows. */
 const STRATEGIES = {

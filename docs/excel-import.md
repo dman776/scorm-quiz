@@ -72,7 +72,9 @@ Rules:
 - Pipes `|` separate options; `=` separates matching pairs; `>` separates the
   sequence order.
 - drag_drop: each token is `item=zone`. Zones are created as labeled boxes in the
-  order they first appear. `Item=Zone A ; Zone B` accepts either zone; `Item=`
+  order they first appear. `Item=Zone A ; Zone B` accepts either zone;
+  `Item=Zone A + Zone B` must be placed in both (any ` + `, with spaces, makes
+  every listed zone required for the whole question's items); `Item=`
   (nothing after `=`) is a distractor; `=Zone` adds a zone with no correct item;
   `Zone[n]` caps the zone at n items. Zones on a background image must be drawn
   in the builder.

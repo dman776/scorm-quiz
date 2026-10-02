@@ -4,7 +4,7 @@
  * Pure functions, no I/O, no randomness. Shared by the authoring preview,
  * the packaged SCO runtime, and the unit tests so scores can never diverge.
  */
-import { QUESTION_KINDS, SCORING_STRATEGY, choiceKindOf } from './types.js';
+import { QUESTION_KINDS, SCORING_STRATEGY, choiceKindOf, dragDropPlacements } from './types.js';
 
 /**
  * @typedef {Object} QuestionResult
@@ -118,21 +118,33 @@ export function scoreQuestion(q, response) {
     }
 
     case QUESTION_KINDS.DRAG_DROP: {
-      // response: { itemId: zoneId }. An item is right when it sits in one of
-      // its accepted zones; a distractor (no accepted zones) placed anywhere
-      // counts against the learner.
-      const map = response && typeof response === 'object' ? response : {};
-      const zoneIds = new Set((q.zones || []).map((z) => z.id));
-      const placed = (it) => zoneIds.has(map[it.id]);
       const items = q.items || [];
-      if (!items.some(placed)) return unanswered();
-      const targets = items.filter((it) => (it.zones || []).length > 0);
-      const right = targets.filter((it) => placed(it) && it.zones.includes(map[it.id])).length;
-      const wrongDistractors = items.filter((it) => !(it.zones || []).length && placed(it)).length;
-      const all = targets.length > 0 && right === targets.length && wrongDistractors === 0;
+      const zoneIds = new Set((q.zones || []).map((z) => z.id));
+      const placed = dragDropPlacements(q, response);
+      if (!placed.length) return unanswered();
+      let right, wrong, needed;
+      if (q.reuseItems) {
+        // Items can sit in several zones and must be in every listed zone.
+        // Each required item->zone placement is one unit; a placement that is
+        // not required counts one against (or every item in every zone wins).
+        const required = new Set(items.flatMap((it) => (it.zones || []).filter((z) => zoneIds.has(z)).map((z) => `${it.id}\n${z}`)));
+        needed = required.size;
+        right = placed.filter(([i, z]) => required.has(`${i}\n${z}`)).length;
+        wrong = placed.length - right;
+      } else {
+        // response: { itemId: zoneId }. An item is right when it sits in one of
+        // its accepted zones; a distractor (no accepted zones) placed anywhere
+        // counts against the learner.
+        const where = Object.fromEntries(placed);
+        const targets = items.filter((it) => (it.zones || []).length > 0);
+        needed = targets.length;
+        right = targets.filter((it) => it.zones.includes(where[it.id])).length;
+        wrong = items.filter((it) => !(it.zones || []).length && where[it.id]).length;
+      }
+      const all = needed > 0 && right === needed && wrong === 0;
       let score;
       if (strategy === SCORING_STRATEGY.ALL_OR_NOTHING) score = all ? max : 0;
-      else score = clampQuestionScore(targets.length ? (max * (right - wrongDistractors)) / targets.length : 0, max, allowNeg);
+      else score = clampQuestionScore(needed ? (max * (right - wrong)) / needed : 0, max, allowNeg);
       return { questionId: q.id, score: round2(score), max,
         outcome: all ? 'correct' : score > 0 ? 'partial' : 'incorrect', answered: true };
     }
