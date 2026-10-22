@@ -8,6 +8,7 @@ import { QUESTION_KINDS, PRESENTATION } from '../../engine/src/types.js';
 import { ScormAdapter } from './adapter.js';
 import { buildInteraction } from './interactions.js';
 import { renderDragDrop } from './dragdrop.js';
+import { renderMatching } from './matching.js';
 import { makeSortable, moveIndex } from './sortable.js';
 import { serializeState, deserializeState, validateStateSize, seededShuffle } from './state.js';
 
@@ -175,16 +176,15 @@ export class AssessmentPlayer {
         break;
       }
       case QUESTION_KINDS.MATCHING: {
-        const cur = val && typeof val === 'object' ? val : {};
-        const matches = [...new Set(q.pairs.map((p) => p.match))];
-        for (const p of q.pairs) {
-          const selId = `${q.id}_${slug(p.prompt)}`;
-          const sel = h('select', { id: selId, class: 'sqb-select', onchange: (e) => {
-            const m = { ...(this.state.answers[q.id] || {}) }; m[p.prompt] = e.target.value; this._answer(q.id, m);
-          } }, h('option', { value: '' }, 'Select...'),
-            ...matches.map((m) => h('option', { value: m, selected: cur[p.prompt] === m }, m)));
-          wrap.append(h('div', { class: 'sqb-match-row' }, h('label', { class: 'sqb-match-prompt', for: selId }, p.prompt), sel));
-        }
+        // Answers never sit beside their own key: a seeded shuffle is stable across
+        // re-renders and resumes without being stored.
+        const matches = [...new Set((q.pairs || []).map((p) => p.match))];
+        const answers = q.shuffleOptions === false ? matches
+          : seededShuffle(matches, (this.settings.seed || 12345) + hashStr(q.id));
+        wrap.append(renderMatching({ q, answers, h,
+          getValue: () => this.state.answers[q.id],
+          onChange: (m) => this._answer(q.id, m),
+          announce: (msg) => this._announce(msg) }));
         break;
       }
       case QUESTION_KINDS.SEQUENCE: {
@@ -435,6 +435,5 @@ function hashStr(s) {
   for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
   return Math.abs(h);
 }
-function slug(s) { return String(s).replace(/[^A-Za-z0-9]/g, '_').slice(0, 40); }
 
 export { scoreAssessment, scoreQuestion, maxQuestionScore };

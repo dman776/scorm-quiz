@@ -26,8 +26,6 @@ body.sqb-body { margin: 0; background: var(--sqb-bg); color: var(--sqb-ink);
 .sqb-opt:focus-within { outline: 3px solid var(--sqb-focus); outline-offset: 2px; }
 .sqb-pill { border-radius: 999px; padding: 8px 16px; display: inline-flex; }
 .sqb-options:has(.sqb-pill) { flex-direction: row; flex-wrap: wrap; }
-.sqb-match-row { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
-.sqb-match-prompt { min-width: 220px; font-weight: 500; }
 .sqb-select, .sqb-number, .sqb-text { font: inherit; padding: 8px 10px;
   border: 1px solid var(--sqb-border); border-radius: var(--sqb-radius); }
 .sqb-text { width: 100%; }
@@ -88,7 +86,6 @@ body.sqb-body { margin: 0; background: var(--sqb-bg); color: var(--sqb-ink);
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
-@media (max-width: 640px) { .sqb-match-prompt { min-width: 100%; } }
 
 /* ---------------------------- Drag and drop ---------------------------- */
 .sqb-dd { display: flex; flex-direction: column; gap: 14px; }
@@ -134,3 +131,37 @@ body.sqb-body { margin: 0; background: var(--sqb-bg); color: var(--sqb-ink);
   align-content: flex-start; pointer-events: none; overflow: visible; }
 .sqb-dd-has-image .sqb-dd-zone .sqb-dd-item { pointer-events: auto; min-height: 32px; padding: 3px 8px; font-size: .85rem; }
 .sqb-review-key { margin: 6px 0 0; padding-left: 20px; font-size: .9rem; }
+
+/* ------------------------------ Matching ------------------------------- */
+.sqb-mt { position: relative; display: flex; flex-direction: column; gap: 12px; }
+.sqb-mt-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: clamp(48px, 18%, 160px); }
+.sqb-mt-col { display: flex; flex-direction: column; justify-content: space-around; gap: 10px; }
+/* Lines sit above the pills but never catch the pointer. */
+.sqb-mt-lines { position: absolute; left: 0; top: 0; z-index: 1; pointer-events: none; overflow: visible; }
+.sqb-mt-line { fill: none; stroke: var(--sqb-primary); stroke-width: 3; stroke-linecap: round; }
+.sqb-mt-line-on { stroke-width: 5; }
+.sqb-mt-line-live { stroke-dasharray: 6 5; }
+.sqb-mt-pill { font: inherit; position: relative; display: flex; align-items: center; gap: 10px; min-height: 44px;
+  padding: 8px 16px; border: 2px solid var(--sqb-border); border-radius: 999px; background: var(--sqb-bg);
+  color: var(--sqb-ink); text-align: left; cursor: pointer; }
+.sqb-mt-key { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+.sqb-mt-text { flex: 1 1 auto; }
+.sqb-mt-ans .sqb-mt-text { order: 2; }
+/* Connector dot on the inner edge of each column; hollow until linked. */
+.sqb-mt-dot { flex: none; width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid var(--sqb-primary); background: var(--sqb-bg); }
+.sqb-mt-key .sqb-mt-dot { order: 2; margin-right: -6px; }
+.sqb-mt-ans .sqb-mt-dot { order: 1; margin-left: -6px; }
+.sqb-mt-pill:hover { border-color: var(--sqb-primary); background: #eef4fb; }
+.sqb-mt-pill:focus-visible { outline: 3px solid var(--sqb-focus); outline-offset: 2px; }
+.sqb-mt-linked { border-color: var(--sqb-primary); }
+.sqb-mt-linked .sqb-mt-dot { background: var(--sqb-primary); }
+.sqb-mt-picked, .sqb-mt-picked:hover { background: var(--sqb-primary); color: var(--sqb-primary-ink); border-color: var(--sqb-primary); }
+.sqb-mt-picked .sqb-mt-dot { border-color: var(--sqb-primary-ink); }
+.sqb-mt-dragging { border-style: dashed; }
+/* While a key is selected or a line is being dragged, mark every answer as a target. */
+.sqb-mt-picking .sqb-mt-ans, .sqb-mt-active .sqb-mt-ans { border-style: dashed; border-color: var(--sqb-primary); }
+.sqb-mt-ans.sqb-mt-over { border-style: solid; background: rgba(11, 92, 173, .12); }
+.sqb-mt-grabbing, .sqb-mt-grabbing * { cursor: grabbing !important; user-select: none !important; -webkit-user-select: none !important; }
+.sqb-mt-hint { color: var(--sqb-muted); font-size: .9rem; margin: 0; }
+@media (max-width: 640px) { .sqb-mt-cols { column-gap: 36px; } .sqb-mt-pill { padding: 6px 10px; font-size: .92rem; } }

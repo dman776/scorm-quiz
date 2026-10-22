@@ -45,6 +45,14 @@ live in `$SQB_DATA_DIR/quizzes/`).
 Only runtime deps are `jszip` (packaging + xlsx parsing) and `nanoid` (ids),
 already vendored under `node_modules`.
 
+## New in 1.7.0
+
+- **Matching: draw lines**: matching questions show the items and answers as
+  pills in two columns, and learners drag a line from each item to its answer.
+  Selecting an item and then an answer (or Space, Tab, Enter on the keyboard)
+  does the same; Delete removes a match. Answers are shuffled so none sits
+  beside its own item.
+
 ## New in 1.6.0
 
 - **Drag and drop: items in more than one zone**: tick "Items can be placed in
