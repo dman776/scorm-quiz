@@ -14,10 +14,13 @@
 
 ## Server
 - Input validation on writes; JSON parsed in try/catch; NO eval anywhere.
-- Storage ids sanitized to [A-Za-z0-9_-] before filesystem access.
+- Library file names reject path separators, NUL and a leading `.`; static files are served only from an allowlist of directories after rejecting `..` and resolving symlinks (realpath).
+- Responses carry `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `X-Frame-Options: SAMEORIGIN`.
 - Export actions appended to an audit log.
 - Auth seam marked in server.js (prototype omits auth by design).
 
 ## CSP (packaged SCO)
+Set via a `<meta>` tag in `index.html.tmpl`; the launch script is external (`runtime/scorm-runtime/src/launch.js`) so inline script is forbidden.
+
 `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';
 img-src 'self' data:; connect-src 'self'; base-uri 'none'; object-src 'none'`

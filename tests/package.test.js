@@ -93,3 +93,12 @@ test('hotspot image size is measured in raw bytes against the 5MB cap', async ()
   assert.ok(!warns(withImage(MAX_HOTSPOT_IMAGE_BYTES)).includes('LARGE_HOTSPOT_IMAGE'));
   assert.ok(warns(withImage(MAX_HOTSPOT_IMAGE_BYTES + 1)).includes('LARGE_HOTSPOT_IMAGE'));
 });
+
+test('packaged SCO has a CSP and no inline script', async () => {
+  const { zip } = await buildScormPackage({ assessment: JSON.parse(fs.readFileSync(new URL('../examples/demo-assessment.json', import.meta.url), 'utf8')) });
+  const z = await JSZip.loadAsync(zip);
+  const html = await z.file('index.html').async('string');
+  assert.match(html, /Content-Security-Policy/);
+  assert.doesNotMatch(html, /<script(?![^>]*\bsrc=)[^>]*>/);
+  assert.ok(z.file('runtime/scorm-runtime/src/launch.js'));
+});

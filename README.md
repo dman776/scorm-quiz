@@ -45,6 +45,21 @@ live in `$SQB_DATA_DIR/quizzes/`).
 Only runtime deps are `jszip` (packaging + xlsx parsing) and `nanoid` (ids),
 already vendored under `node_modules`.
 
+## New in 1.7.1
+
+- **Security hardening**: the static file server no longer allows path
+  traversal (`..%2f` could read files outside the served folders, such as
+  `.git` and saved quizzes). Responses now carry `nosniff`, `Referrer-Policy`
+  and `X-Frame-Options` headers, and exported packages include a
+  Content-Security-Policy; the launch script moved out of `index.html` into
+  `runtime/scorm-runtime/src/launch.js` so inline script can be forbidden.
+- **Readable validation messages**: warnings and errors name a question by
+  number and the start of its prompt (`Question 3 ("What is...")`) instead of
+  its internal id.
+- **Numbered question list**: the questions on the left are numbered, the
+  numbers follow drag-and-drop reordering, and the editor heading shows the
+  number too.
+
 ## New in 1.7.0
 
 - **Matching: draw lines**: matching questions show the items and answers as

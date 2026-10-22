@@ -34,6 +34,7 @@ body { margin: 0; font-family: var(--font); color: var(--ink); background: var(-
 .q-item .q-prompt { font-size: .85rem; }
 .q-move { display: flex; gap: 4px; }
 .q-item { user-select: none; -webkit-user-select: none; }
+.q-item .q-num { flex: 0 0 auto; min-width: 1.6em; text-align: right; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
 .q-item .q-main { flex: 1 1 auto; min-width: 0; }
 .seq-row { cursor: grab; border-radius: 8px; }
 .seq-row input { cursor: text; }

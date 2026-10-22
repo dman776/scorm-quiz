@@ -113,11 +113,19 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
   '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
 function serveStatic(res, pathname) {
   if (pathname === '/') { res.writeHead(302, { Location: '/apps/web/index.html' }); res.end(); return; }
-  const full = path.join(ROOT, pathname);
+  const notFound = () => { res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('Not found'); };
+  // Reject traversal before touching the filesystem (the path arrives decoded, so
+  // "..%2f" has already become "../"), then confirm the real path (symlinks
+  // resolved) is still inside an allowed directory.
+  if (pathname.includes('\0') || pathname.split(/[\\/]/).includes('..')) return notFound();
   const allowed = pathname === '/preview.html' || STATIC_PREFIXES.some((p) => pathname.startsWith(p));
-  if (!allowed || !full.startsWith(ROOT + path.sep) || !fs.existsSync(full) || fs.statSync(full).isDirectory()) {
-    res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('Not found'); return;
-  }
+  if (!allowed) return notFound();
+  let full;
+  try { full = fs.realpathSync(path.join(ROOT, pathname)); } catch { return notFound(); }
+  const realRoot = fs.realpathSync(ROOT);
+  const inAllowedDir = full === path.join(realRoot, 'preview.html')
+    || STATIC_PREFIXES.some((p) => full.startsWith(path.join(realRoot, p)));
+  if (!inAllowedDir || !fs.statSync(full).isFile()) return notFound();
   res.writeHead(200, { 'Content-Type': MIME[path.extname(full)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
   fs.createReadStream(full).pipe(res);
 }
@@ -140,6 +148,9 @@ function newAssessment(input = {}) {
 }
 
 const server = http.createServer(async (req, res) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');

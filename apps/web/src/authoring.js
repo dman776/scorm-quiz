@@ -88,6 +88,7 @@ function renderList() {
   model.questions.forEach((q, i) => {
     const item = el('li', { class: 'q-item' + (q.id === activeId ? ' active' : ''), onclick: () => { activeId = q.id; render(); } },
       el('span', { class: 'q-grip', 'aria-hidden': 'true', title: 'Drag to reorder' }, '\u2807\u2807'),
+      el('span', { class: 'q-num', 'aria-label': `Question ${i + 1}` }, String(i + 1)),
       el('div', { class: 'q-main' }, el('div', { class: 'q-kind' }, q.kind.replace('_', ' ')), el('div', { class: 'q-prompt' }, (q.prompt || '').slice(0, 40))),
       el('div', { class: 'q-move' },
         el('button', { 'aria-label': 'Move up', disabled: i === 0, onclick: (e) => { e.stopPropagation(); move(i, -1); } }, '\u2191'),
@@ -98,7 +99,7 @@ function renderList() {
 /** Drag a question to a new position (the arrows remain the keyboard way). */
 makeSortable(/** @type {HTMLElement} */ ($('#q-list')), {
   itemSelector: '.q-item', handleSelector: '.q-grip', scrollEl: /** @type {HTMLElement} */ ($('.app-left')),
-  onReorder: (from, to) => { model.questions = moveIndex(model.questions, from, to); touch(); renderList(); },
+  onReorder: (from, to) => { model.questions = moveIndex(model.questions, from, to); touch(); render(); },
 });
 
 function move(i, d) {
@@ -122,7 +123,7 @@ function renderEditor() {
   c.innerHTML = '';
   const q = model.questions.find((x) => x.id === activeId);
   if (!q) { c.append(el('p', { class: 'empty' }, 'Select or add a question to begin editing.')); return; }
-  c.append(el('div', { class: 'editor-head' }, el('h2', {}, 'Edit question'),
+  c.append(el('div', { class: 'editor-head' }, el('h2', {}, `Edit question ${model.questions.indexOf(q) + 1}`),
     el('span', { class: 'inline' }, typePicker(q),
       el('button', { class: 'btn', title: 'Try just this question as a learner', onclick: () => openPreview(q) }, 'Preview this question'),
       el('button', { class: 'btn', onclick: () => duplicate(q) }, 'Duplicate'),
