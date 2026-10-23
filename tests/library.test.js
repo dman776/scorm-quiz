@@ -65,3 +65,41 @@ test('DELETE removes one file; path tricks are rejected', async () => {
   assert.equal((await call('GET', `/api/assessments/${encodeURIComponent('../quizzes/broken')}`)).status, 400);
   assert.equal((await call('GET', `/api/assessments/${encodeURIComponent('.hidden')}`)).status, 400);
 });
+
+test('folders: create, save into, move, rename, list and delete only when empty', async () => {
+  assert.equal((await call('POST', '/api/folders', { path: 'safety/ppe' })).data.folder, 'safety/ppe');
+  const created = await call('POST', '/api/assessments?folder=safety%2Fppe', quiz('Gloves'));
+  assert.equal(created.data.file, 'safety/ppe/gloves');
+  assert.ok(fs.existsSync(path.join(quizDir, 'safety', 'ppe', 'gloves.json')));
+  assert.equal((await call('GET', `/api/assessments/${encodeURIComponent('safety/ppe/gloves')}`)).data.title, 'Gloves');
+
+  const moved = await call('POST', `/api/assessments/${encodeURIComponent('safety/ppe/gloves')}/move`, { folder: 'safety' });
+  assert.equal(moved.data.file, 'safety/gloves');
+  assert.equal((await call('POST', '/api/folders/rename', { path: 'safety/ppe', name: 'gear' })).data.folder, 'safety/gear');
+  assert.deepEqual((await call('GET', '/api/folders')).data.folders, ['safety', 'safety/gear']);
+  const listed = (await call('GET', '/api/assessments')).data.assessments.find((a) => a.file === 'safety/gloves');
+  assert.equal(listed.folder, 'safety');
+
+  assert.equal((await call('DELETE', '/api/folders?path=safety')).status, 409);
+  assert.equal((await call('DELETE', '/api/folders?path=safety%2Fgear')).data.deleted, true);
+  assert.equal((await call('POST', `/api/assessments/${encodeURIComponent('safety/gloves')}/move`, { folder: '' })).data.file, 'gloves');
+});
+
+test('folder paths reject traversal and hidden names', async () => {
+  assert.equal((await call('POST', '/api/folders', { path: '../escape' })).status, 400);
+  assert.equal((await call('POST', '/api/folders', { path: 'a/.hidden' })).status, 400);
+  assert.equal((await call('GET', `/api/assessments/${encodeURIComponent('safety/../../x')}`)).status, 400);
+  assert.equal((await call('POST', '/api/folders/rename', { path: 'safety', name: '../up' })).status, 400);
+  assert.ok(!fs.existsSync(path.join(dataDir, 'escape')));
+});
+
+test('answer key and question CSV download, named after the quiz id', async () => {
+  await call('PUT', '/api/assessments/keyed', { ...quiz('Keyed', 'Quiz "One"'), questions: [] });
+  const key = await fetch(`${base}/api/assessments/keyed/answer-key`);
+  assert.equal(key.status, 200);
+  assert.equal(key.headers.get('content-disposition'), 'attachment; filename="quiz-one_answer_key.txt"');
+  assert.match(await key.text(), /Answer Key: Keyed/);
+  const csv = await fetch(`${base}/api/assessments/keyed/questions.csv`);
+  assert.equal(csv.status, 200);
+  assert.equal(csv.headers.get('content-disposition'), 'attachment; filename="quiz-one_questions.csv"');
+});

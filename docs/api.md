@@ -9,14 +9,24 @@ to move the `data/` root). Library routes address a quiz by its FILE name withou
 hand appear and open too. Creating never overwrites an existing file. The list
 includes files that cannot be parsed, with an `error`, so nothing is hidden.
 
+The library can be organized into folders, which are real subdirectories of
+`data/quizzes/`. A file in a folder is addressed by its relative path, e.g.
+`safety/ppe-basics` (URL-encode the `/` as `%2F` inside `:file`). Folder and file
+names may not start with `.` or `_`, and `..` is rejected.
+
 | Method | Path | Purpose | Body | Response |
 | --- | --- | --- | --- | --- |
 | GET | `/api/version` | App version (root package.json) | - | `{ version }` |
 | GET | `/api/assessments` | List every library file, newest first | - | `{ assessments: [{ file, title, ... } or { file, error }] }` |
-| POST | `/api/assessments` | Save as a NEW file named after the title (`-2`, `-3`... if taken) | assessment | `201 { file, assessment }` |
+| POST | `/api/assessments?folder=` | Save as a NEW file named after the title (`-2`, `-3`... if taken), in `folder` (default: top level) | assessment | `201 { file, assessment }` |
 | GET | `/api/assessments/:file` | Fetch a library file | - | assessment |
 | PUT | `/api/assessments/:file` | Overwrite that file (quiz id kept as sent) | assessment | `{ file, assessment }` |
 | DELETE | `/api/assessments/:file` | Delete that file | - | `{ deleted }` |
+| POST | `/api/assessments/:file/move` | Move a file to another folder (`''` = top level), keeping its name; `409` if taken | `{ folder }` | `{ file }` |
+| GET | `/api/folders` | List every folder, empty ones included | - | `{ folders: ['safety', 'safety/ppe'] }` |
+| POST | `/api/folders` | Create a folder (and missing parents) | `{ path }` | `201 { folder }` |
+| POST | `/api/folders/rename` | Rename a folder in place | `{ path, name }` | `{ folder }` |
+| DELETE | `/api/folders?path=` | Delete an EMPTY folder; `409` if it has contents | - | `{ deleted }` |
 | POST | `/api/assessments/:id/validate` | Validate | assessment (else the stored one) | `{ errors, warnings }` |
 | POST | `/api/assessments/:id/export` | Build SCORM ZIP | assessment (else the stored one) | `application/zip` or `422` |
 | GET | `/api/assessments/:id/answer-key` | Answer key (text) | - | `text/plain` |

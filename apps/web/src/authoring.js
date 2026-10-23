@@ -31,6 +31,8 @@ let dirty = draft ? localStorage.getItem('sqb-dirty') === '1' : false;
  * Drafts from before this was tracked were saved under their quiz id.
  */
 let libraryFile = draft ? (localStorage.getItem('sqb-file') ?? (draft.updatedAt ? draft.id : null)) : null;
+/** Library folder being browsed ('' is the top level); a quiz saved for the first time goes here. */
+let libFolder = '';
 let activeId = model.questions[0]?.id || null;
 
 function blankQuiz() {
@@ -617,7 +619,7 @@ async function saveToLibrary() {
     const headers = { 'Content-Type': 'application/json' };
     const saved = libraryFile
       ? await api(`/api/assessments/${encodeURIComponent(libraryFile)}`, { method: 'PUT', headers, body })
-      : await api('/api/assessments', { method: 'POST', headers, body });
+      : await api(`/api/assessments?folder=${encodeURIComponent(libFolder)}`, { method: 'POST', headers, body });
     model.updatedAt = saved.assessment.updatedAt;
     libraryFile = saved.file;
     setDirty(false); save();
@@ -651,13 +653,51 @@ async function openFromLibrary(file) {
 }
 
 async function deleteFromLibrary(item) {
-  if (!confirm(`Delete "${item.title || item.file}" (${item.file}.json) from the library? This cannot be undone.`)) return;
+  if (!confirm(`Delete "${item.title || item.file}" (${baseName(item.file)}.json) from the library? This cannot be undone.`)) return;
   try {
     await api(`/api/assessments/${encodeURIComponent(item.file)}`, { method: 'DELETE' });
     // Still open in the editor, but no longer saved anywhere.
     if (item.file === libraryFile) { libraryFile = null; setDirty(true); save(); }
     openLibrary();
   } catch (err) { alert('Delete failed. ' + err.message); }
+}
+
+const parentFolder = (p) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '');
+const baseName = (p) => p.slice(p.lastIndexOf('/') + 1);
+const jsonInit = (method, body) => ({ method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+
+function browseFolder(folder) { libFolder = folder; openLibrary(); }
+
+async function newFolder() {
+  const name = prompt(libFolder ? `New folder inside ${libFolder}:` : 'New folder name:');
+  if (name == null || !name.trim()) return;
+  try { browseFolder((await api('/api/folders', jsonInit('POST', { path: (libFolder ? libFolder + '/' : '') + name.trim() }))).folder); }
+  catch (err) { alert('Could not create the folder. ' + err.message); }
+}
+
+async function renameFolder(folder) {
+  const name = prompt('Rename folder:', baseName(folder));
+  if (name == null || !name.trim()) return;
+  try {
+    const renamed = (await api('/api/folders/rename', jsonInit('POST', { path: folder, name: name.trim() }))).folder;
+    // The open quiz may live inside the renamed folder.
+    if (libraryFile && libraryFile.startsWith(folder + '/')) { libraryFile = renamed + libraryFile.slice(folder.length); save(); }
+    browseFolder(renamed);
+  } catch (err) { alert('Rename failed. ' + err.message); }
+}
+
+async function deleteFolder(folder) {
+  if (!confirm(`Delete the folder "${folder}"? Only an empty folder can be deleted.`)) return;
+  try { await api(`/api/folders?path=${encodeURIComponent(folder)}`, { method: 'DELETE' }); browseFolder(parentFolder(folder)); }
+  catch (err) { alert('Delete failed. ' + err.message); }
+}
+
+async function moveToFolder(item, folder) {
+  try {
+    const moved = (await api(`/api/assessments/${encodeURIComponent(item.file)}/move`, jsonInit('POST', { folder }))).file;
+    if (item.file === libraryFile) { libraryFile = moved; save(); }
+  } catch (err) { alert('Move failed. ' + err.message); }
+  openLibrary();
 }
 
 async function openLibrary() {
@@ -674,7 +714,7 @@ async function openLibrary() {
   };
   c.append(el('div', { class: 'lib' },
     el('h2', {}, 'Library'),
-    el('p', { class: 'lib-sub' }, 'Open a saved quiz, start a new one, or import from Excel or a project file.'),
+    el('p', { class: 'lib-sub' }, 'Open a saved quiz, start a new one, organize quizzes into folders, or import from Excel or a project file.'),
     el('div', { class: 'card' }, el('h3', {}, 'Start'),
       el('div', { class: 'lib-actions' },
         el('button', { class: 'btn btn-primary', onclick: newQuiz }, '+ New quiz'),
@@ -683,29 +723,66 @@ async function openLibrary() {
         el('button', { class: 'btn', onclick: exportProjectJson }, 'Export project JSON'),
         el('a', { class: 'btn btn-link', href: '../../examples/template.xlsx', download: '' }, 'Download Excel template'))),
     el('div', { class: 'card' }, el('h3', {}, 'Saved quizzes'),
-      el('p', { class: 'hint lib-dir' }, 'Every .json file in data/quizzes/'), listEl)));
+      el('p', { class: 'hint lib-dir' }, `Every .json file in data/quizzes/${libFolder ? libFolder + '/' : ''}`), listEl)));
 
-  let items;
-  try { items = (await api('/api/assessments')).assessments; }
+  let items, folders;
+  try { [items, folders] = await Promise.all([api('/api/assessments').then((d) => d.assessments), api('/api/folders').then((d) => d.folders)]); }
   catch (err) { listEl.replaceChildren(el('p', { class: 'issue error' }, err.message)); return; }
   if (view !== 'library') return;
-  if (!items.length) { listEl.replaceChildren(el('p', { class: 'hint' }, 'No saved quizzes yet. Use Save in the top bar to add the current quiz.')); return; }
-  listEl.replaceChildren(el('ul', { class: 'lib-items' }, items.map((it) => {
-    const current = it.file === libraryFile;
-    const n = it.questionCount;
-    const modified = new Date(it.modifiedAt).toLocaleString();
-    const meta = it.error ? [it.error] : [`v${it.version || '1.0'}`, `${n} question${n === 1 ? '' : 's'}`,
-      `pass ${it.passingPercent}%`, `saved ${modified}`];
-    return el('li', { class: 'lib-item' + (current ? ' current' : '') + (it.error ? ' broken' : '') },
-      el('div', { class: 'lib-item-main' },
-        el('div', { class: 'lib-name' }, it.title || (it.error ? it.file : 'Untitled'),
-          current ? el('span', { class: 'badge', style: 'margin-left:8px' }, dirty ? 'Open, unsaved changes' : 'Open') : null),
-        el('div', { class: 'lib-file' }, `${it.file}.json`),
-        el('div', { class: 'lib-meta' }, meta.join(' \u00b7 '))),
-      el('div', { class: 'lib-item-actions' },
-        it.error ? null : el('button', { class: 'btn btn-small', onclick: () => openFromLibrary(it.file) }, 'Open'),
-        el('button', { class: 'btn btn-small btn-danger', 'aria-label': `Delete ${it.file}.json`, onclick: () => deleteFromLibrary(it) }, 'Delete')));
-  })));
+  if (libFolder && !folders.includes(libFolder)) libFolder = '';
+
+  const crumbs = [el('button', { class: 'btn btn-small btn-link', onclick: () => browseFolder('') }, 'Library')];
+  let acc = '';
+  for (const seg of libFolder.split('/').filter(Boolean)) {
+    acc = acc ? `${acc}/${seg}` : seg;
+    const target = acc;
+    crumbs.push(el('span', { class: 'lib-sep', 'aria-hidden': 'true' }, '/'),
+      el('button', { class: 'btn btn-small btn-link', onclick: () => browseFolder(target) }, seg));
+  }
+  const toolbar = el('div', { class: 'lib-crumbs' },
+    el('nav', { class: 'lib-path', 'aria-label': 'Folder' }, crumbs),
+    el('div', { class: 'lib-folder-actions' },
+      libFolder ? el('button', { class: 'btn btn-small', onclick: () => renameFolder(libFolder) }, 'Rename folder') : null,
+      libFolder ? el('button', { class: 'btn btn-small btn-danger', onclick: () => deleteFolder(libFolder) }, 'Delete folder') : null,
+      el('button', { class: 'btn btn-small', onclick: newFolder }, '+ New folder')));
+
+  const subfolders = folders.filter((f) => parentFolder(f) === libFolder);
+  const here = items.filter((it) => it.folder === libFolder);
+  if (!subfolders.length && !here.length) {
+    listEl.replaceChildren(toolbar, el('p', { class: 'hint' }, libFolder
+      ? 'This folder is empty. Move quizzes here with "Move to", or Save a new quiz while this folder is open.'
+      : 'No saved quizzes yet. Use Save in the top bar to add the current quiz.'));
+    return;
+  }
+  const moveTargets = [''].concat(folders).filter((f) => f !== libFolder);
+  listEl.replaceChildren(toolbar, el('ul', { class: 'lib-items' },
+    subfolders.map((f) => {
+      const n = items.filter((it) => it.file.startsWith(f + '/')).length;
+      return el('li', { class: 'lib-item lib-folder' },
+        el('button', { class: 'lib-folder-open', onclick: () => browseFolder(f) },
+          el('span', { class: 'lib-name' }, '\ud83d\udcc1 ' + baseName(f)),
+          el('span', { class: 'lib-meta' }, `${n} quiz${n === 1 ? '' : 'zes'}`)));
+    }),
+    here.map((it) => {
+      const current = it.file === libraryFile;
+      const n = it.questionCount;
+      const modified = new Date(it.modifiedAt).toLocaleString();
+      const meta = it.error ? [it.error] : [`v${it.version || '1.0'}`, `${n} question${n === 1 ? '' : 's'}`,
+        `pass ${it.passingPercent}%`, `saved ${modified}`];
+      return el('li', { class: 'lib-item' + (current ? ' current' : '') + (it.error ? ' broken' : '') },
+        el('div', { class: 'lib-item-main' },
+          el('div', { class: 'lib-name' }, it.title || (it.error ? baseName(it.file) : 'Untitled'),
+            current ? el('span', { class: 'badge', style: 'margin-left:8px' }, dirty ? 'Open, unsaved changes' : 'Open') : null),
+          el('div', { class: 'lib-file' }, `${baseName(it.file)}.json`),
+          el('div', { class: 'lib-meta' }, meta.join(' \u00b7 '))),
+        el('div', { class: 'lib-item-actions' },
+          moveTargets.length ? el('select', { class: 'lib-move', 'aria-label': `Move ${baseName(it.file)}.json to a folder`,
+            onchange: (e) => moveToFolder(it, e.target.value === '/' ? '' : e.target.value) },
+            el('option', { value: '', disabled: true, selected: true }, 'Move to\u2026'),
+            moveTargets.map((f) => el('option', { value: f || '/' }, f || 'Library (top level)'))) : null,
+          it.error ? null : el('button', { class: 'btn btn-small', onclick: () => openFromLibrary(it.file) }, 'Open'),
+          el('button', { class: 'btn btn-small btn-danger', 'aria-label': `Delete ${baseName(it.file)}.json`, onclick: () => deleteFromLibrary(it) }, 'Delete')));
+    })));
 }
 
 function render() { renderList(); renderEditor(); renderIssues(); }

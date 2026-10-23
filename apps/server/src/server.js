@@ -30,35 +30,64 @@ function slugify(s) {
 }
 
 /**
- * The library: every `*.json` file in data/quizzes, addressed by its file name
- * without `.json`. Files are identified by name, not by the quiz id inside
+ * The library: every `*.json` file under data/quizzes, addressed by its path
+ * relative to that folder without `.json` (`safety/ppe-basics`). Folders are
+ * real directories. Files are identified by name, not by the quiz id inside
  * them, so files added by hand (any name, duplicate ids) all show up and open.
  */
+const fail = (status, message) => Object.assign(new Error(message), { status });
+/** True for a usable file or folder name: no separators, not hidden, not internal. */
+const okSegment = (seg) => !!seg && !seg.startsWith('.') && !seg.startsWith('_') && !/[\\/\0]/.test(seg);
 const store = {
-  /** Path of an existing-or-new library file, or null if `name` is not a plain file name. */
+  /** Path of an existing-or-new library file, or null if `name` is not a valid library path. */
   file(name) {
-    name = String(name || '');
-    if (!name || name.startsWith('.') || /[\\/\0]/.test(name)) return null;
-    const f = path.join(QUIZ_DIR, `${name}.json`);
-    return path.dirname(f) === QUIZ_DIR ? f : null;
+    const segs = String(name || '').split('/');
+    if (!segs.every(okSegment)) return null;
+    const f = path.join(QUIZ_DIR, `${segs.join('/')}.json`);
+    return f.startsWith(QUIZ_DIR + path.sep) ? f : null;
   },
-  names() {
-    return fs.readdirSync(QUIZ_DIR).filter((f) => f.endsWith('.json') && !f.startsWith('.') && !f.startsWith('_'))
-      .map((f) => f.slice(0, -5));
+  /** Directory for a folder path ('' is the library root), or null if it is not a valid path. */
+  dir(folder) {
+    folder = String(folder || '');
+    if (!folder) return QUIZ_DIR;
+    const segs = folder.split('/');
+    return segs.every(okSegment) ? path.join(QUIZ_DIR, ...segs) : null;
+  },
+  /** Every library file name, in every folder. */
+  names(folder = '') {
+    const out = [];
+    for (const e of fs.readdirSync(/** @type {string} */ (store.dir(folder)), { withFileTypes: true })) {
+      if (!okSegment(e.name)) continue;
+      const rel = folder ? `${folder}/${e.name}` : e.name;
+      if (e.isDirectory()) out.push(...store.names(rel));
+      else if (e.name.endsWith('.json')) out.push(rel.slice(0, -5));
+    }
+    return out;
+  },
+  /** Every folder (empty ones too), sorted. */
+  folders(folder = '') {
+    const out = [];
+    for (const e of fs.readdirSync(/** @type {string} */ (store.dir(folder)), { withFileTypes: true })) {
+      if (!e.isDirectory() || !okSegment(e.name)) continue;
+      const rel = folder ? `${folder}/${e.name}` : e.name;
+      out.push(rel, ...store.folders(rel));
+    }
+    return out.sort((a, b) => a.localeCompare(b));
   },
   /** Summaries of every file, newest first. Unreadable files are listed with an error. */
   list() {
     return store.names().map((name) => {
       const f = path.join(QUIZ_DIR, `${name}.json`);
+      const folder = name.includes('/') ? name.slice(0, name.lastIndexOf('/')) : '';
       const modifiedAt = fs.statSync(f).mtime.toISOString();
       try {
         const a = JSON.parse(fs.readFileSync(f, 'utf8'));
         if (!a || typeof a !== 'object' || !Array.isArray(a.questions)) throw new Error('not a quiz project (no questions array)');
-        return { file: name, id: a.id, title: a.title, description: a.description, status: a.status,
+        return { file: name, folder, id: a.id, title: a.title, description: a.description, status: a.status,
           version: a.version, updatedAt: a.updatedAt, modifiedAt, questionCount: a.questions.length,
           passingPercent: a.settings?.passingPercent ?? 80, scormVersion: '2004 4th Edition' };
       } catch (err) {
-        return { file: name, modifiedAt, error: `Cannot read: ${err.message}` };
+        return { file: name, folder, modifiedAt, error: `Cannot read: ${err.message}` };
       }
     }).sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt));
   },
@@ -67,17 +96,68 @@ const store = {
     return f && fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : null;
   },
   /** Write to an existing or explicitly named file. */
-  put(name, a) { fs.writeFileSync(/** @type {string} */ (store.file(name)), JSON.stringify(a, null, 2)); return a; },
-  /** Write to a NEW file named after `base`, adding -2, -3... so nothing is overwritten. */
-  create(base, a) {
+  put(name, a) {
+    const f = /** @type {string} */ (store.file(name));
+    fs.mkdirSync(path.dirname(f), { recursive: true });
+    fs.writeFileSync(f, JSON.stringify(a, null, 2));
+    return a;
+  },
+  /** Write to a NEW file in `folder` named after `base`, adding -2, -3... so nothing is overwritten. */
+  create(base, a, folder = '') {
+    const dir = store.dir(folder);
+    if (!dir) throw fail(400, 'Invalid folder name');
+    fs.mkdirSync(dir, { recursive: true });
     const stem = slugify(base);
+    const prefix = folder ? `${folder}/` : '';
     const taken = new Set(store.names().map((n) => n.toLowerCase()));
     let name = stem;
-    for (let n = 2; taken.has(name); n++) name = `${stem}-${n}`;
-    fs.writeFileSync(path.join(QUIZ_DIR, `${name}.json`), JSON.stringify(a, null, 2), { flag: 'wx' });
-    return name;
+    for (let n = 2; taken.has((prefix + name).toLowerCase()); n++) name = `${stem}-${n}`;
+    fs.writeFileSync(path.join(dir, `${name}.json`), JSON.stringify(a, null, 2), { flag: 'wx' });
+    return prefix + name;
   },
   del(name) { const f = store.file(name); if (f && fs.existsSync(f)) { fs.unlinkSync(f); return true; } return false; },
+  /** Move a file into `folder` ('' is the root), keeping its name. Returns the new file name. */
+  move(name, folder) {
+    const from = store.file(name);
+    const dir = store.dir(folder);
+    if (!from || !fs.existsSync(from)) throw fail(404, 'Not found');
+    if (!dir) throw fail(400, 'Invalid folder name');
+    const base = path.basename(from, '.json');
+    const to = folder ? `${folder}/${base}` : base;
+    if (to === name) return to;
+    if (fs.existsSync(/** @type {string} */ (store.file(to)))) throw fail(409, `${to}.json already exists`);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.renameSync(from, /** @type {string} */ (store.file(to)));
+    return to;
+  },
+  /** Create a folder (and any missing parents). */
+  mkFolder(folder) {
+    const dir = folder ? store.dir(folder) : null;
+    if (!dir) throw fail(400, 'Invalid folder name');
+    fs.mkdirSync(dir, { recursive: true });
+    return folder;
+  },
+  /** Rename a folder in place (same parent). Returns its new path. */
+  renameFolder(folder, newName) {
+    const from = folder ? store.dir(folder) : null;
+    newName = String(newName || '').trim();
+    if (!from || !fs.existsSync(from)) throw fail(404, 'Not found');
+    if (!okSegment(newName)) throw fail(400, 'Invalid folder name');
+    const parent = folder.includes('/') ? folder.slice(0, folder.lastIndexOf('/')) : '';
+    const to = parent ? `${parent}/${newName}` : newName;
+    if (to === folder) return to;
+    if (fs.existsSync(/** @type {string} */ (store.dir(to)))) throw fail(409, `A folder named ${newName} already exists`);
+    fs.renameSync(from, /** @type {string} */ (store.dir(to)));
+    return to;
+  },
+  /** Delete a folder; only an empty one, so no quiz is ever removed this way. */
+  delFolder(folder) {
+    const dir = folder ? store.dir(folder) : null;
+    if (!dir || !fs.existsSync(dir)) throw fail(404, 'Not found');
+    if (fs.readdirSync(dir).length) throw fail(409, 'The folder is not empty. Move or delete its contents first.');
+    fs.rmdirSync(dir);
+    return true;
+  },
 };
 function auditExport(entry) {
   fs.appendFileSync(path.join(DATA_DIR, '_export-audit.log'), JSON.stringify({ ...entry, t: new Date().toISOString() }) + '\n');
@@ -181,12 +261,25 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // Library folders. The folder path travels in the body or ?path=, never in the URL path.
+    if (parts[1] === 'folders') {
+      try {
+        if (parts.length === 2 && req.method === 'GET') return json(res, 200, { folders: store.folders() });
+        if (parts.length === 2 && req.method === 'POST') return json(res, 201, { folder: store.mkFolder((await readBody(req)).path) });
+        if (parts[2] === 'rename' && req.method === 'POST') {
+          const body = await readBody(req);
+          return json(res, 200, { folder: store.renameFolder(body.path, body.name) });
+        }
+        if (parts.length === 2 && req.method === 'DELETE') return json(res, 200, { deleted: store.delFolder(url.searchParams.get('path') || '') });
+      } catch (err) { return json(res, err.status || 400, { error: err.message }); }
+    }
+
     if (parts[1] === 'assessments' && parts.length === 2) {
       if (req.method === 'GET') return json(res, 200, { assessments: store.list() });
       // Always a new file, named after the title; never overwrites.
       if (req.method === 'POST') {
         const a = { ...newAssessment(await readBody(req)), updatedAt: new Date().toISOString() };
-        const file = store.create(a.title, a);
+        const file = store.create(a.title, a, url.searchParams.get('folder') || '');
         return json(res, 201, { file, assessment: a });
       }
     }
@@ -207,6 +300,10 @@ const server = http.createServer(async (req, res) => {
         }
         if (req.method === 'DELETE') { const ok = store.del(name); return json(res, ok ? 200 : 404, { deleted: ok }); }
       }
+      if (action === 'move' && req.method === 'POST') {
+        try { return json(res, 200, { file: store.move(name, (await readBody(req)).folder || '') }); }
+        catch (err) { return json(res, err.status || 400, { error: err.message }); }
+      }
       // validate/export use the posted editor copy when there is one, so
       // unsaved edits are what gets checked and packaged.
       if (action === 'validate' && req.method === 'POST') {
@@ -215,12 +312,14 @@ const server = http.createServer(async (req, res) => {
         if (!a) return json(res, 404, { error: 'Not found' });
         return json(res, 200, validateAssessment(a));
       }
+      // Download name from the quiz id (else the file name), made safe for the header.
+      const dlName = slugify(existing?.id || path.basename(name));
       if (action === 'answer-key' && req.method === 'GET' && existing) {
-        res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Content-Disposition': `attachment; filename="${id}_answer_key.txt"` });
+        res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Content-Disposition': `attachment; filename="${dlName}_answer_key.txt"` });
         return res.end(buildAnswerKey(existing));
       }
       if (action === 'questions.csv' && req.method === 'GET' && existing) {
-        res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${id}_questions.csv"` });
+        res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${dlName}_questions.csv"` });
         return res.end(buildQuestionCsv(existing));
       }
       if (action === 'export' && req.method === 'POST') {
@@ -242,7 +341,7 @@ const server = http.createServer(async (req, res) => {
       if (!body || body.schemaVersion !== 1 || !Array.isArray(body.questions))
         return json(res, 400, { error: 'Invalid or unsupported project file' });
       const a = { ...newAssessment(body), updatedAt: new Date().toISOString() };
-      return json(res, 201, { file: store.create(a.title, a), assessment: a });
+      return json(res, 201, { file: store.create(a.title, a, url.searchParams.get('folder') || ''), assessment: a });
     }
 
     json(res, 404, { error: 'Not found' });

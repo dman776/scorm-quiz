@@ -66,7 +66,23 @@ body { margin: 0; font-family: var(--font); color: var(--ink); background: var(-
 .lib-dir { margin: -6px 0 10px; color: var(--muted); font-size: .78rem; }
 .lib-item.broken { border-color: var(--danger); background: #fdf6f5; }
 .lib-item.broken .lib-meta { color: var(--danger); }
-.lib-item-actions { display: flex; gap: 6px; flex: none; }
+.lib-item-actions { display: flex; gap: 6px; flex: none; align-items: center; }
+.lib-crumbs { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.lib-path { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; }
+.lib-path .btn-link { padding: 5px 4px; }
+.lib-sep { color: var(--muted); }
+.lib-folder-actions { display: flex; gap: 6px; }
+.lib-folder { padding: 0; }
+.lib-folder-open { all: unset; box-sizing: border-box; display: flex; align-items: baseline; gap: 10px; width: 100%;
+  padding: 10px 12px; border-radius: 8px; cursor: pointer; }
+.lib-folder-open:hover { background: #eef4fb; }
+.lib-folder-open:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.lib-move { font: inherit; font-size: .85rem; max-width: 170px; padding: 5px 28px 5px 10px; line-height: normal;
+  border: 1px solid var(--primary); border-radius: 8px; color: var(--primary); cursor: pointer;
+  -webkit-appearance: none; -moz-appearance: none; appearance: none;
+  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%230b5cad' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 10px center; }
+.lib-move:hover { background-color: #eef4fb; }
+.lib-move:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .btn-small { padding: 5px 10px; font-size: .85rem; }
 .btn-danger { border-color: var(--danger); color: var(--danger); }
 .btn-danger:hover { background: #fdf0ef; }
