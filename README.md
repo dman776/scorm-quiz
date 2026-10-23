@@ -38,12 +38,37 @@ npm run e2e:sim          # full attempt scored + reported through a mock LMS
 ```
 
 `npm start` serves the authoring UI at `/` and the learner preview at
-`/preview.html`. The library is one JSON file per quiz in `data/quizzes/`. Set
+`/preview.html`. The library is one JSON file per quiz in `data/quizzes/`, organized
+into folders (real subdirectories) from the Library screen. Set
 `PORT` to change the port, and `SQB_DATA_DIR` to move the data root (quizzes then
 live in `$SQB_DATA_DIR/quizzes/`).
 
 Only runtime deps are `jszip` (packaging + xlsx parsing) and `nanoid` (ids),
 already vendored under `node_modules`.
+
+## New in 1.9.0
+
+- **Library tree view**: saved quizzes and folders show as one expandable tree
+  (with **Expand all** / **Collapse all**) instead of browsing one folder at a
+  time.
+- **Move or delete several quizzes at once**: tick quizzes, or tick a folder to
+  select everything inside it, then use **Move to folder** or **Delete
+  selected** in the selection bar. A quiz whose file name already exists in the
+  destination is skipped and reported, never overwritten.
+- **⋮ action menus**: each folder (New subfolder, Rename folder, Delete folder)
+  and each quiz (Open, Move to…, Delete) keeps its actions in a ⋮ menu.
+  Clicking a quiz's title opens it. Menus close on Escape or an outside click.
+- A quiz saved for the first time now goes to the top level of the library;
+  move it into a folder from there.
+
+## New in 1.8.0
+
+- **Library folders**: quizzes can be organized into nested folders, which are
+  real subdirectories of `data/quizzes/`. Create, rename and delete (empty)
+  folders, and move quizzes between them. New API routes: `/api/folders` and
+  `/api/assessments/:file/move` (see `docs/api.md`).
+- Fix: the answer-key and questions.csv downloads failed with an error; they now
+  download, named after the quiz id.
 
 ## New in 1.7.1
 

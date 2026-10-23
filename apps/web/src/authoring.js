@@ -31,8 +31,6 @@ let dirty = draft ? localStorage.getItem('sqb-dirty') === '1' : false;
  * Drafts from before this was tracked were saved under their quiz id.
  */
 let libraryFile = draft ? (localStorage.getItem('sqb-file') ?? (draft.updatedAt ? draft.id : null)) : null;
-/** Library folder being browsed ('' is the top level); a quiz saved for the first time goes here. */
-let libFolder = '';
 let activeId = model.questions[0]?.id || null;
 
 function blankQuiz() {
@@ -619,7 +617,7 @@ async function saveToLibrary() {
     const headers = { 'Content-Type': 'application/json' };
     const saved = libraryFile
       ? await api(`/api/assessments/${encodeURIComponent(libraryFile)}`, { method: 'PUT', headers, body })
-      : await api(`/api/assessments?folder=${encodeURIComponent(libFolder)}`, { method: 'POST', headers, body });
+      : await api('/api/assessments', { method: 'POST', headers, body });
     model.updatedAt = saved.assessment.updatedAt;
     libraryFile = saved.file;
     setDirty(false); save();
@@ -658,6 +656,7 @@ async function deleteFromLibrary(item) {
     await api(`/api/assessments/${encodeURIComponent(item.file)}`, { method: 'DELETE' });
     // Still open in the editor, but no longer saved anywhere.
     if (item.file === libraryFile) { libraryFile = null; setDirty(true); save(); }
+    selectedFiles.delete(item.file);
     openLibrary();
   } catch (err) { alert('Delete failed. ' + err.message); }
 }
@@ -665,14 +664,77 @@ async function deleteFromLibrary(item) {
 const parentFolder = (p) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '');
 const baseName = (p) => p.slice(p.lastIndexOf('/') + 1);
 const jsonInit = (method, body) => ({ method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+const plural = (n, one, many = one + 's') => `${n} ${n === 1 ? one : many}`;
 
-function browseFolder(folder) { libFolder = folder; openLibrary(); }
+/** Library tree state, kept while switching views: expanded folders and ticked quiz files. */
+const openFolders = new Set();
+const selectedFiles = new Set();
+let libTreeInitialized = false;
+/** Last lists fetched by openLibrary(), so ticking and expanding redraw without a server call. */
+let libItems = [];
+let libFolders = [];
 
-async function newFolder() {
-  const name = prompt(libFolder ? `New folder inside ${libFolder}:` : 'New folder name:');
+const ICON_CHEVRON = '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const ICON_FOLDER = '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" fill="#fdf3dc" stroke="#b7791f" stroke-width="1.8" stroke-linejoin="round"/></svg>';
+const ICON_FILE = '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6z M14 3v4h4" fill="none" stroke="#0b5cad" stroke-width="1.8" stroke-linejoin="round"/></svg>';
+const ICON_DOTS = '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="3" r="1.6" fill="currentColor"/><circle cx="8" cy="8" r="1.6" fill="currentColor"/><circle cx="8" cy="13" r="1.6" fill="currentColor"/></svg>';
+const ICON_CARET = '<svg width="10" height="6" viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+/** A span holding one of the fixed icon strings above. */
+function icon(svg, cls = 'lib-ico') { const s = el('span', { class: cls }); s.innerHTML = svg; return s; }
+
+/** Close every open popup menu except `keep`. */
+function closeLibMenus(keep) {
+  for (const m of document.querySelectorAll('.lib-menu.open')) {
+    if (m === keep) continue;
+    m.classList.remove('open');
+    m.parentElement?.querySelector('[aria-haspopup]')?.setAttribute('aria-expanded', 'false');
+  }
+}
+document.addEventListener('click', (e) => {
+  if (!(e.target instanceof Element) || !e.target.closest('.lib-menu-wrap')) closeLibMenus();
+});
+document.addEventListener('keydown', (e) => {
+  const open = e.key === 'Escape' && document.querySelector('.lib-menu.open');
+  if (!open) return;
+  closeLibMenus();
+  open.parentElement?.querySelector('[aria-haspopup]')?.focus();
+});
+
+/**
+ * A button plus the popup menu it opens. Items: { label, onclick, danger?, depth? }.
+ * `align` 'left' opens the menu toward the right (for buttons at the left edge).
+ */
+function menuWrap(button, items, align) {
+  const menu = el('div', { class: 'lib-menu' + (align === 'left' ? ' left' : ''), role: 'menu' },
+    items.map((it) => el('button', {
+      type: 'button', role: 'menuitem', class: 'lib-menu-item' + (it.danger ? ' danger' : ''),
+      style: it.depth ? `padding-left:${12 + it.depth * 16}px` : null,
+      onclick: () => { closeLibMenus(); it.onclick(); },
+    }, it.label)));
+  button.setAttribute('aria-haspopup', 'true');
+  button.setAttribute('aria-expanded', 'false');
+  button.addEventListener('click', () => {
+    const opening = !menu.classList.contains('open');
+    closeLibMenus(menu);
+    menu.classList.remove('up');
+    menu.classList.toggle('open', opening);
+    button.setAttribute('aria-expanded', String(opening));
+    // Open upward when the menu would run past the bottom of the window.
+    if (opening && menu.getBoundingClientRect().bottom > window.innerHeight
+      && button.getBoundingClientRect().top > menu.offsetHeight + 8) menu.classList.add('up');
+    if (opening) menu.querySelector('button')?.focus();
+  });
+  return el('div', { class: 'lib-menu-wrap' }, button, menu);
+}
+
+async function newFolder(parent) {
+  const name = prompt(parent ? `New folder inside ${parent}:` : 'New folder name:');
   if (name == null || !name.trim()) return;
-  try { browseFolder((await api('/api/folders', jsonInit('POST', { path: (libFolder ? libFolder + '/' : '') + name.trim() }))).folder); }
-  catch (err) { alert('Could not create the folder. ' + err.message); }
+  try {
+    const folder = (await api('/api/folders', jsonInit('POST', { path: (parent ? parent + '/' : '') + name.trim() }))).folder;
+    for (let p = folder; p; p = parentFolder(p)) openFolders.add(p);
+    openLibrary();
+  } catch (err) { alert('Could not create the folder. ' + err.message); }
 }
 
 async function renameFolder(folder) {
@@ -680,24 +742,56 @@ async function renameFolder(folder) {
   if (name == null || !name.trim()) return;
   try {
     const renamed = (await api('/api/folders/rename', jsonInit('POST', { path: folder, name: name.trim() }))).folder;
+    const swap = (p) => (p === folder || p.startsWith(folder + '/') ? renamed + p.slice(folder.length) : p);
     // The open quiz may live inside the renamed folder.
-    if (libraryFile && libraryFile.startsWith(folder + '/')) { libraryFile = renamed + libraryFile.slice(folder.length); save(); }
-    browseFolder(renamed);
+    if (libraryFile && libraryFile.startsWith(folder + '/')) { libraryFile = swap(libraryFile); save(); }
+    for (const set of [openFolders, selectedFiles]) { const next = [...set].map(swap); set.clear(); next.forEach((p) => set.add(p)); }
+    openLibrary();
   } catch (err) { alert('Rename failed. ' + err.message); }
 }
 
 async function deleteFolder(folder) {
   if (!confirm(`Delete the folder "${folder}"? Only an empty folder can be deleted.`)) return;
-  try { await api(`/api/folders?path=${encodeURIComponent(folder)}`, { method: 'DELETE' }); browseFolder(parentFolder(folder)); }
+  try { await api(`/api/folders?path=${encodeURIComponent(folder)}`, { method: 'DELETE' }); openFolders.delete(folder); openLibrary(); }
   catch (err) { alert('Delete failed. ' + err.message); }
 }
 
-async function moveToFolder(item, folder) {
-  try {
-    const moved = (await api(`/api/assessments/${encodeURIComponent(item.file)}/move`, jsonInit('POST', { folder }))).file;
-    if (item.file === libraryFile) { libraryFile = moved; save(); }
-  } catch (err) { alert('Move failed. ' + err.message); }
+/** Move every ticked quiz into `folder`. A name already taken there is skipped and reported, never overwritten. */
+async function moveSelected(folder) {
+  const skipped = [];
+  for (const file of [...selectedFiles].filter((f) => parentFolder(f) !== folder)) {
+    try {
+      const moved = (await api(`/api/assessments/${encodeURIComponent(file)}/move`, jsonInit('POST', { folder }))).file;
+      if (file === libraryFile) { libraryFile = moved; save(); }
+    } catch (err) { skipped.push(`${baseName(file)}.json: ${err.message}`); }
+  }
+  selectedFiles.clear();
+  for (let p = folder; p; p = parentFolder(p)) openFolders.add(p);
+  if (skipped.length) alert('Some quizzes were not moved:\n' + skipped.join('\n'));
   openLibrary();
+}
+
+async function deleteSelected() {
+  const files = [...selectedFiles];
+  if (!confirm(`Delete ${plural(files.length, 'quiz', 'quizzes')} from the library? This cannot be undone.`)) return;
+  const failed = [];
+  for (const file of files) {
+    try {
+      await api(`/api/assessments/${encodeURIComponent(file)}`, { method: 'DELETE' });
+      // Still open in the editor, but no longer saved anywhere.
+      if (file === libraryFile) { libraryFile = null; setDirty(true); save(); }
+    } catch (err) { failed.push(`${baseName(file)}.json: ${err.message}`); }
+  }
+  selectedFiles.clear();
+  if (failed.length) alert('Some quizzes were not deleted:\n' + failed.join('\n'));
+  openLibrary();
+}
+
+/** "Move to..." on one quiz: tick just that quiz and open the bulk Move menu. */
+function moveOne(file) {
+  selectedFiles.clear(); selectedFiles.add(file);
+  renderLibTree();
+  $('.lib-selbar [aria-haspopup]')?.click();
 }
 
 async function openLibrary() {
@@ -706,7 +800,6 @@ async function openLibrary() {
   renderList();
   const c = $('#editor');
   c.innerHTML = '';
-  const listEl = el('div', {}, el('p', { class: 'hint' }, 'Loading...'));
   const fileBtn = (label, accept, onFile) => {
     const input = el('input', { type: 'file', accept, class: 'sr-only',
       onchange: (e) => { if (e.target.files[0]) onFile(e.target.files[0]); e.target.value = ''; } });
@@ -722,67 +815,108 @@ async function openLibrary() {
         ...fileBtn('Import project JSON', 'application/json,.json', importProject),
         el('button', { class: 'btn', onclick: exportProjectJson }, 'Export project JSON'),
         el('a', { class: 'btn btn-link', href: '../../examples/template.xlsx', download: '' }, 'Download Excel template'))),
-    el('div', { class: 'card' }, el('h3', {}, 'Saved quizzes'),
-      el('p', { class: 'hint lib-dir' }, `Every .json file in data/quizzes/${libFolder ? libFolder + '/' : ''}`), listEl)));
+    el('div', { class: 'card' },
+      el('div', { class: 'lib-head' },
+        el('h3', {}, 'Saved quizzes'),
+        el('div', { class: 'lib-head-actions' },
+          el('button', { class: 'btn btn-small', onclick: () => { libFolders.forEach((f) => openFolders.add(f)); renderLibTree(); } }, 'Expand all'),
+          el('button', { class: 'btn btn-small', onclick: () => { openFolders.clear(); renderLibTree(); } }, 'Collapse all'),
+          el('button', { class: 'btn btn-small btn-solid', onclick: () => newFolder('') }, '+ New folder'))),
+      el('p', { class: 'hint lib-dir' }, 'Every .json file in data/quizzes/ and its folders'),
+      el('div', { id: 'lib-list' }, el('p', { class: 'hint' }, 'Loading...')))));
 
-  let items, folders;
-  try { [items, folders] = await Promise.all([api('/api/assessments').then((d) => d.assessments), api('/api/folders').then((d) => d.folders)]); }
-  catch (err) { listEl.replaceChildren(el('p', { class: 'issue error' }, err.message)); return; }
+  try { [libItems, libFolders] = await Promise.all([api('/api/assessments').then((d) => d.assessments), api('/api/folders').then((d) => d.folders)]); }
+  catch (err) { $('#lib-list').replaceChildren(el('p', { class: 'issue error' }, err.message)); return; }
   if (view !== 'library') return;
-  if (libFolder && !folders.includes(libFolder)) libFolder = '';
+  // First visit: everything expanded. Afterwards keep the user's choice.
+  if (!libTreeInitialized) { libFolders.forEach((f) => openFolders.add(f)); libTreeInitialized = true; }
+  const known = new Set(libItems.map((it) => it.file));
+  for (const f of [...selectedFiles]) if (!known.has(f)) selectedFiles.delete(f);
+  renderLibTree();
+}
 
-  const crumbs = [el('button', { class: 'btn btn-small btn-link', onclick: () => browseFolder('') }, 'Library')];
-  let acc = '';
-  for (const seg of libFolder.split('/').filter(Boolean)) {
-    acc = acc ? `${acc}/${seg}` : seg;
-    const target = acc;
-    crumbs.push(el('span', { class: 'lib-sep', 'aria-hidden': 'true' }, '/'),
-      el('button', { class: 'btn btn-small btn-link', onclick: () => browseFolder(target) }, seg));
-  }
-  const toolbar = el('div', { class: 'lib-crumbs' },
-    el('nav', { class: 'lib-path', 'aria-label': 'Folder' }, crumbs),
-    el('div', { class: 'lib-folder-actions' },
-      libFolder ? el('button', { class: 'btn btn-small', onclick: () => renameFolder(libFolder) }, 'Rename folder') : null,
-      libFolder ? el('button', { class: 'btn btn-small btn-danger', onclick: () => deleteFolder(libFolder) }, 'Delete folder') : null,
-      el('button', { class: 'btn btn-small', onclick: newFolder }, '+ New folder')));
-
-  const subfolders = folders.filter((f) => parentFolder(f) === libFolder);
-  const here = items.filter((it) => it.folder === libFolder);
-  if (!subfolders.length && !here.length) {
-    listEl.replaceChildren(toolbar, el('p', { class: 'hint' }, libFolder
-      ? 'This folder is empty. Move quizzes here with "Move to", or Save a new quiz while this folder is open.'
-      : 'No saved quizzes yet. Use Save in the top bar to add the current quiz.'));
+/** Redraw the selection bar and folder tree from the last fetched lists. */
+function renderLibTree() {
+  const listEl = $('#lib-list');
+  if (!listEl) return;
+  if (!libItems.length && !libFolders.length) {
+    listEl.replaceChildren(el('p', { class: 'hint' }, 'No saved quizzes yet. Use Save in the top bar to add the current quiz.'));
     return;
   }
-  const moveTargets = [''].concat(folders).filter((f) => f !== libFolder);
-  listEl.replaceChildren(toolbar, el('ul', { class: 'lib-items' },
-    subfolders.map((f) => {
-      const n = items.filter((it) => it.file.startsWith(f + '/')).length;
-      return el('li', { class: 'lib-item lib-folder' },
-        el('button', { class: 'lib-folder-open', onclick: () => browseFolder(f) },
-          el('span', { class: 'lib-name' }, '\ud83d\udcc1 ' + baseName(f)),
-          el('span', { class: 'lib-meta' }, `${n} quiz${n === 1 ? '' : 'zes'}`)));
-    }),
-    here.map((it) => {
-      const current = it.file === libraryFile;
-      const n = it.questionCount;
-      const modified = new Date(it.modifiedAt).toLocaleString();
-      const meta = it.error ? [it.error] : [`v${it.version || '1.0'}`, `${n} question${n === 1 ? '' : 's'}`,
-        `pass ${it.passingPercent}%`, `saved ${modified}`];
-      return el('li', { class: 'lib-item' + (current ? ' current' : '') + (it.error ? ' broken' : '') },
-        el('div', { class: 'lib-item-main' },
-          el('div', { class: 'lib-name' }, it.title || (it.error ? baseName(it.file) : 'Untitled'),
-            current ? el('span', { class: 'badge', style: 'margin-left:8px' }, dirty ? 'Open, unsaved changes' : 'Open') : null),
-          el('div', { class: 'lib-file' }, `${baseName(it.file)}.json`),
-          el('div', { class: 'lib-meta' }, meta.join(' \u00b7 '))),
-        el('div', { class: 'lib-item-actions' },
-          moveTargets.length ? el('select', { class: 'lib-move', 'aria-label': `Move ${baseName(it.file)}.json to a folder`,
-            onchange: (e) => moveToFolder(it, e.target.value === '/' ? '' : e.target.value) },
-            el('option', { value: '', disabled: true, selected: true }, 'Move to\u2026'),
-            moveTargets.map((f) => el('option', { value: f || '/' }, f || 'Library (top level)'))) : null,
-          it.error ? null : el('button', { class: 'btn btn-small', onclick: () => openFromLibrary(it.file) }, 'Open'),
-          el('button', { class: 'btn btn-small btn-danger', 'aria-label': `Delete ${baseName(it.file)}.json`, onclick: () => deleteFromLibrary(it) }, 'Delete')));
-    })));
+  const rows = [];
+  libRows('', 0, rows);
+  listEl.replaceChildren(libSelectionBar(), el('div', { class: 'lib-tree', role: 'tree', 'aria-label': 'Saved quizzes' }, rows));
+}
+
+function libSelectionBar() {
+  const n = selectedFiles.size;
+  const all = libItems.length > 0 && n === libItems.length;
+  const selectAll = el('input', { type: 'checkbox', class: 'lib-check', checked: all, onchange: () => {
+    if (all) selectedFiles.clear(); else libItems.forEach((it) => selectedFiles.add(it.file));
+    renderLibTree();
+  } });
+  selectAll.indeterminate = n > 0 && !all;
+  const moveBtn = el('button', { type: 'button', class: 'btn btn-small btn-solid' }, 'Move to folder ', icon(ICON_CARET, 'lib-caret'));
+  const targets = [{ label: 'Library (top level)', folder: '', depth: 0 }]
+    .concat(libFolders.map((f) => ({ label: baseName(f), folder: f, depth: f.split('/').length - 1 })));
+  return el('div', { class: 'lib-selbar' + (n ? ' active' : '') },
+    el('label', { class: 'lib-selall' }, selectAll, 'Select all'),
+    n ? el('span', { class: 'lib-selcount' }, `${plural(n, 'quiz', 'quizzes')} selected`) : null,
+    n ? menuWrap(moveBtn, targets.map((t) => ({ label: t.label, depth: t.depth, onclick: () => moveSelected(t.folder) })), 'left') : null,
+    n ? el('button', { type: 'button', class: 'btn btn-small btn-danger', onclick: deleteSelected }, 'Delete selected') : null,
+    n ? el('button', { type: 'button', class: 'btn btn-small btn-link', onclick: () => { selectedFiles.clear(); renderLibTree(); } }, 'Clear') : null,
+    n ? null : el('span', { class: 'hint lib-selhint' }, 'Tick quizzes (or a whole folder) to move several at once.'));
+}
+
+/** Rows for `folder`: its subfolders (sorted) then its quizzes (newest first, as listed). */
+function libRows(folder, depth, rows) {
+  const indent = `padding-left:${12 + depth * 24}px`;
+  for (const f of libFolders.filter((x) => parentFolder(x) === folder).sort((a, b) => a.localeCompare(b))) {
+    const within = libItems.filter((it) => it.file.startsWith(f + '/'));
+    const n = within.filter((it) => selectedFiles.has(it.file)).length;
+    const full = within.length > 0 && n === within.length;
+    const isOpen = openFolders.has(f);
+    const check = el('input', { type: 'checkbox', class: 'lib-check', checked: full, disabled: !within.length,
+      'aria-label': `Select everything in ${f}`,
+      onchange: () => { within.forEach((it) => (full ? selectedFiles.delete(it.file) : selectedFiles.add(it.file))); renderLibTree(); } });
+    check.indeterminate = n > 0 && !full;
+    rows.push(el('div', { class: 'lib-row lib-folder' + (full ? ' selected' : ''), role: 'treeitem', 'aria-expanded': String(isOpen), style: indent },
+      check,
+      el('button', { type: 'button', class: 'lib-toggle', onclick: () => { if (isOpen) openFolders.delete(f); else openFolders.add(f); renderLibTree(); } },
+        icon(ICON_CHEVRON, 'lib-chevron' + (isOpen ? ' open' : '')), icon(ICON_FOLDER),
+        el('span', { class: 'lib-name' }, baseName(f)),
+        el('span', { class: 'lib-meta' }, plural(within.length, 'quiz', 'quizzes'))),
+      menuWrap(el('button', { type: 'button', class: 'lib-kebab', 'aria-label': `Actions for folder ${f}` }, icon(ICON_DOTS, 'lib-dots')), [
+        { label: 'New subfolder', onclick: () => newFolder(f) },
+        { label: 'Rename folder', onclick: () => renameFolder(f) },
+        { label: 'Delete folder', danger: true, onclick: () => deleteFolder(f) },
+      ])));
+    if (isOpen) libRows(f, depth + 1, rows);
+  }
+  for (const it of libItems.filter((x) => x.folder === folder)) {
+    const on = selectedFiles.has(it.file);
+    const current = it.file === libraryFile;
+    const n = it.questionCount;
+    const meta = it.error ? [it.error] : [`v${it.version || '1.0'}`, plural(n, 'question'),
+      `pass ${it.passingPercent}%`, `saved ${new Date(it.modifiedAt).toLocaleString()}`];
+    const title = [
+      el('span', { class: 'lib-name' }, it.title || (it.error ? baseName(it.file) : 'Untitled'),
+        current ? el('span', { class: 'badge', style: 'margin-left:8px' }, dirty ? 'Open, unsaved changes' : 'Open') : null),
+      el('span', { class: 'lib-file' }, `${baseName(it.file)}.json`),
+      el('span', { class: 'lib-meta' }, meta.join(' · ')),
+    ];
+    rows.push(el('div', { class: 'lib-row lib-quiz' + (on ? ' selected' : '') + (current ? ' current' : '') + (it.error ? ' broken' : ''), role: 'treeitem', style: indent },
+      el('input', { type: 'checkbox', class: 'lib-check', checked: on, 'aria-label': `Select ${baseName(it.file)}.json`,
+        onchange: () => { if (on) selectedFiles.delete(it.file); else selectedFiles.add(it.file); renderLibTree(); } }),
+      icon(ICON_FILE, 'lib-ico lib-ico-file'),
+      it.error ? el('div', { class: 'lib-title' }, title)
+        : el('button', { type: 'button', class: 'lib-title', title: 'Open this quiz', onclick: () => openFromLibrary(it.file) }, title),
+      menuWrap(el('button', { type: 'button', class: 'lib-kebab', 'aria-label': `Actions for ${baseName(it.file)}.json` }, icon(ICON_DOTS, 'lib-dots')), [
+        ...(it.error ? [] : [{ label: 'Open', onclick: () => openFromLibrary(it.file) }]),
+        { label: 'Move to…', onclick: () => moveOne(it.file) },
+        { label: 'Delete', danger: true, onclick: () => deleteFromLibrary(it) },
+      ])));
+  }
 }
 
 function render() { renderList(); renderEditor(); renderIssues(); }
