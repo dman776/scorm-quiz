@@ -18,7 +18,8 @@ Questions are a discriminated union on `kind`.
   "shuffleAnswers": false, "seed": 12345, "timeLimitSec": null,
   "passMessage": "string", "failMessage": "string",
   "results": { "showScore": true, "showPassFail": true, "showCorrectCount": true,
-    "showCorrectAnswers": true, "delayUntilFinalAttempt": true, "showMissedOnly": false } }
+    "showCorrectAnswers": true, "delayUntilFinalAttempt": true, "showMissedOnly": false,
+    "showLearnerResponses": false } }
 ```
 
 ## Question (discriminated union on `kind`)

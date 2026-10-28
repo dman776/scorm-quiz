@@ -41,7 +41,7 @@ function blankQuiz() {
       passingPercent: 80, maxAttempts: 2, scoreRetention: 'highest',
       shuffleQuestions: false, shuffleAnswers: false, seed: 12345, allowBackward: true, requireAnswer: false,
       passMessage: 'Congratulations, you passed.', failMessage: 'You did not reach the passing score.',
-      results: { showScore: true, showPassFail: true, showCorrectCount: true, showCorrectAnswers: true, delayUntilFinalAttempt: true, showMissedOnly: false },
+      results: { showScore: true, showPassFail: true, showCorrectCount: true, showCorrectAnswers: true, delayUntilFinalAttempt: true, showMissedOnly: false, showLearnerResponses: false },
     },
     questions: [],
   };
@@ -486,7 +486,7 @@ function openSettings() {
   const r = s.results;
   c.append(el('div', { class: 'field' }, el('label', {}, 'Results display'),
     ...[['showScore', 'Show score'], ['showPassFail', 'Show pass/fail'], ['showCorrectCount', 'Show number correct'],
-      ['showCorrectAnswers', 'Show correct answers'], ['delayUntilFinalAttempt', 'Delay answers until final attempt'], ['showMissedOnly', 'Show missed only']]
+      ['showCorrectAnswers', 'Show correct answers'], ['delayUntilFinalAttempt', 'Delay answers until final attempt'], ['showMissedOnly', 'Show missed only'], ['showLearnerResponses', "Show learner's answers"]]
       .map(([k, l]) => el('label', { class: 'inline' }, el('input', { type: 'checkbox', checked: !!r[k], onchange: (e) => { r[k] = e.target.checked; touch(); } }), ' ' + l))));
 }
 

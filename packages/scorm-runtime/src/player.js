@@ -4,7 +4,7 @@
  * powers the authoring preview and the exported SCO.
  */
 import { scoreAssessment, scoreQuestion, maxQuestionScore } from '../../engine/src/scoring.js';
-import { QUESTION_KINDS, PRESENTATION } from '../../engine/src/types.js';
+import { QUESTION_KINDS, PRESENTATION, choiceKindOf, dragDropPlacements } from '../../engine/src/types.js';
 import { ScormAdapter } from './adapter.js';
 import { buildInteraction } from './interactions.js';
 import { renderDragDrop } from './dragdrop.js';
@@ -383,19 +383,25 @@ export class AssessmentPlayer {
       scored.passed ? (this.settings.passMessage || 'Congratulations, you passed.') : (this.settings.failMessage || 'You did not reach the passing score.')));
     if (r.showCorrectCount) screen.append(h('p', {}, `Correct answers: ${scored.correctCount} of ${scored.results.length}`));
     const showAnswers = r.showCorrectAnswers && (!r.delayUntilFinalAttempt || this._isFinalAttempt());
-    if (showAnswers) screen.append(this._answerReview(scored, r));
+    if (showAnswers || r.showLearnerResponses) screen.append(this._answerReview(scored, r, showAnswers));
     this.root.append(screen);
     screen.querySelector('h2').focus();
     this._announce(scored.passed ? 'You passed the assessment.' : 'Assessment complete.');
   }
-  _answerReview(scored, r) {
-    const box = h('div', { class: 'sqb-answer-review' }, h('h3', {}, 'Answer review'));
+  /**
+   * Per-question review. `showAnswers` reveals outcomes, feedback and keys;
+   * without it (learner responses only) nothing hints at correctness.
+   */
+  _answerReview(scored, r, showAnswers) {
+    const box = h('div', { class: 'sqb-answer-review' }, h('h3', {}, showAnswers ? 'Answer review' : 'Your answers'));
     const byId = Object.fromEntries(this.questions.map((q) => [q.id, q]));
     for (const res of scored.results) {
-      if (r.showMissedOnly && res.outcome === 'correct') continue;
+      if (showAnswers && r.showMissedOnly && res.outcome === 'correct') continue;
       const q = byId[res.questionId];
-      const item = h('div', { class: 'sqb-review-q ' + res.outcome });
+      const item = h('div', { class: 'sqb-review-q' + (showAnswers ? ' ' + res.outcome : '') });
       item.append(h('p', { class: 'sqb-review-prompt' }, q.prompt));
+      if (r.showLearnerResponses) item.append(learnerAnswer(q, this.state.answers[q.id]));
+      if (!showAnswers) { box.append(item); continue; }
       item.append(h('p', { class: 'sqb-review-outcome' }, `Result: ${res.outcome} (${res.score}/${res.max})`));
       const fb = res.outcome === 'correct' ? q.correctFeedback
         : res.outcome === 'partial' ? (q.partialFeedback || q.incorrectFeedback) : q.incorrectFeedback;
@@ -412,6 +418,45 @@ export class AssessmentPlayer {
     return this.state.attempt >= max;
   }
   _announce(msg) { this.live.textContent = ''; setTimeout(() => (this.live.textContent = msg), 30); }
+}
+
+/** The learner's own response in readable form, shown in the answer review. */
+function learnerAnswer(q, response) {
+  const label = h('span', { class: 'sqb-review-label' }, 'Your answer: ');
+  const asArr = (v) => (Array.isArray(v) ? v : v == null || v === '' ? [] : [v]);
+  const optLabel = (list, id) => (list || []).find((o) => o.id === id)?.label ?? id;
+  let text = '', lines = null;
+  switch (choiceKindOf(q)) {
+    case QUESTION_KINDS.SINGLE_SELECT:
+    case QUESTION_KINDS.MULTIPLE_SELECT:
+    case QUESTION_KINDS.TRUE_FALSE:
+    case QUESTION_KINDS.SINGLE_CHECKBOX:
+      text = asArr(response).map((id) => optLabel(q.options, id)).join('; ');
+      break;
+    case QUESTION_KINDS.SEQUENCE:
+      lines = asArr(response).map((id) => optLabel(q.items, id));
+      break;
+    case QUESTION_KINDS.MATCHING: {
+      const map = response && typeof response === 'object' ? response : {};
+      lines = (q.pairs || []).filter((p) => map[p.prompt]).map((p) => `${p.prompt}: ${map[p.prompt]}`);
+      break;
+    }
+    case QUESTION_KINDS.DRAG_DROP: {
+      const zoneLabel = Object.fromEntries((q.zones || []).map((z) => [z.id, z.label]));
+      const byItem = new Map();
+      for (const [i, z] of dragDropPlacements(q, response)) byItem.set(i, [...(byItem.get(i) || []), zoneLabel[z]]);
+      lines = (q.items || []).filter((it) => byItem.has(it.id)).map((it) => `${it.label}: ${byItem.get(it.id).join(' and ')}`);
+      break;
+    }
+    default:
+      text = response == null ? '' : String(response).trim();
+  }
+  if (lines) {
+    if (!lines.length) return h('p', { class: 'sqb-review-learner' }, label, 'Not answered');
+    return h('div', { class: 'sqb-review-learner' }, label,
+      h(choiceKindOf(q) === QUESTION_KINDS.SEQUENCE ? 'ol' : 'ul', { class: 'sqb-review-key' }, lines.map((l) => h('li', {}, l))));
+  }
+  return h('p', { class: 'sqb-review-learner' }, label, text || 'Not answered');
 }
 
 /** Correct placement for each item, shown in the answer review. */

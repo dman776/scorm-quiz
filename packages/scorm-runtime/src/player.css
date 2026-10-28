@@ -82,6 +82,7 @@ body.sqb-body { margin: 0; background: var(--sqb-bg); color: var(--sqb-ink);
 .sqb-review-q.partial { border-left-color: #b58100; }
 .sqb-review-prompt { font-weight: 600; }
 .sqb-review-outcome::before { content: "\25CF"; margin-right: 6px; }
+.sqb-review-label { font-weight: 600; }
 .sqb-review-rationale { color: var(--sqb-muted); font-style: italic; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
