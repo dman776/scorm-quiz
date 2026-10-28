@@ -37,6 +37,14 @@ order, continuing after any `_count` already on the LMS, so they are always
 contiguous. The question-to-index map is kept in `suspend_data` (`ix`), so a
 resumed session updates the same records.
 
+**Retries.** While the learner has not passed and has attempts left
+(`maxAttempts`, 0 = unlimited), submit commits with `cmi.exit = suspend` and
+leaves the session open; the results screen offers Retry. A retry starts a new
+attempt in the same session, so its interactions append after the earlier
+attempt's. `cmi.score.*` and `success_status` report the score chosen by
+`scoreRetention` (highest, latest or first), kept in `suspend_data` (`rs`). The
+last allowed attempt, or a pass, ends with `cmi.exit = normal` and Terminate.
+
 **Formats (IEEE 1484.11.1).** Responses use identifiers derived from the answer
 TEXT so LMS reports are readable: runs of characters outside `[A-Za-z0-9_.-]`
 become `_`, capped at 64 chars, with `_2`, `_3` suffixes for duplicate labels

@@ -103,7 +103,7 @@ The learner clicks regions on an image, such as a diagram, photo or screenshot.
 - **Per-answer score values**: point weight assignable at the option level, with an optional negative-score allowance and incorrect-selection penalty. **Implemented.**
 - **Overall passing score** as a percentage (e.g. 80%). **Implemented.** Passing on a raw point threshold (e.g. 24/30) is validated against the maximum possible score but not yet used to decide pass/fail. **Partial.**<cite>turn1search12</cite><cite>turn1search16</cite>
 - **Section/topic subscoring** in the LMS results. **Not yet built** (sections are stored per question).<cite>turn1search11</cite>
-- **Attempt limits** (`maxAttempts`, 0 = unlimited) and score retention (highest / latest / first). **Partial:** the attempt limit controls when correct answers are revealed; learner messaging about attempts remaining is not built.
+- **Attempt limits** (`maxAttempts`, 0 = unlimited) and score retention (highest / latest / first). Retries happen inside one SCO session: a learner who has not passed and has attempts left gets a Retry button on the results screen, which reshuffles (if enabled) and starts a fresh attempt; the reported score follows the retention rule.
 - **Time limit** (`timeLimitSec`). **Partial:** stored and carried in resume state, but no countdown or auto-submit yet.<cite>turn1search11</cite>
 - **Question and answer randomization**, deterministic from a quiz seed so a learner's order survives suspend/resume. **Implemented.**
 - **Navigation**: allow going back, and optionally require an answer before moving on. **Implemented.**

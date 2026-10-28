@@ -63,7 +63,14 @@ export class AssessmentPlayer {
     const suspend = this.adapter.getValue('cmi.suspend_data');
     const restored = deserializeState(suspend);
     if (restored && restored.order && restored.order.length) { this.state = restored; return; }
-    const seed = this.settings.seed || 12345;
+    this.state = { flagged: [], index: 0, submitted: false, attempt: 1, interactionIndex: {},
+      remainingTime: this.settings.timeLimitSec ?? null, ...this._freshOrder(1), answers: {} };
+    this._persist();
+  }
+
+  /** Question and answer order for an attempt; later attempts reshuffle. */
+  _freshOrder(attempt) {
+    const seed = (this.settings.seed || 12345) + attempt - 1;
     let ids = this.a.questions.map((q) => q.id);
     if (this.settings.shuffleQuestions) ids = seededShuffle(ids, seed);
     const answerOrder = {};
@@ -75,9 +82,7 @@ export class AssessmentPlayer {
           answerOrder[q.id] = seededShuffle(q.items.map((it) => it.id), seed + hashStr(q.id));
       }
     }
-    this.state = { order: ids, answers: {}, flagged: [], index: 0, submitted: false,
-      attempt: 1, remainingTime: this.settings.timeLimitSec ?? null, answerOrder, interactionIndex: {} };
-    this._persist();
+    return { order: ids, answerOrder };
   }
 
   get questions() {
@@ -92,7 +97,8 @@ export class AssessmentPlayer {
       this.adapter.logger({ fn: 'STATE_WARNING', args: [check.size], result: 'exceeds limit' });
     this.adapter.setValue('cmi.suspend_data', s);
     this.adapter.setValue('cmi.location', String(this.state.index));
-    if (!this.state.submitted) this.adapter.setValue('cmi.completion_status', 'incomplete');
+    // A retry keeps the earlier attempt's completion until it is resubmitted.
+    if (!this.state.submitted && !this.state.retained) this.adapter.setValue('cmi.completion_status', 'incomplete');
     this.adapter.commit();
   }
 
@@ -351,25 +357,50 @@ export class AssessmentPlayer {
   _submit() {
     const scored = scoreAssessment(this.questions, this.state.answers, { passingPercent: this.settings.passingPercent ?? 80 });
     const resultsById = Object.fromEntries(scored.results.map((r) => [r.questionId, r]));
-    this.adapter.setValue('cmi.score.raw', String(scored.raw));
-    this.adapter.setValue('cmi.score.min', String(scored.min));
-    this.adapter.setValue('cmi.score.max', String(scored.max));
-    this.adapter.setValue('cmi.score.scaled', String(scored.scaled));
+    const kept = retainScore(this.state.retained, scored, this.settings.scoreRetention);
+    this.state.retained = { raw: kept.raw, min: kept.min, max: kept.max, scaled: kept.scaled,
+      percent: kept.percent, passed: kept.passed };
+    this.adapter.setValue('cmi.score.raw', String(kept.raw));
+    this.adapter.setValue('cmi.score.min', String(kept.min));
+    this.adapter.setValue('cmi.score.max', String(kept.max));
+    this.adapter.setValue('cmi.score.scaled', String(kept.scaled));
     this.adapter.setValue('cmi.progress_measure', '1');
     this.adapter.setValue('cmi.completion_status', 'completed');
-    this.adapter.setValue('cmi.success_status', scored.passed ? 'passed' : 'failed');
+    this.adapter.setValue('cmi.success_status', kept.passed ? 'passed' : 'failed');
     this.adapter.setValue('cmi.session_time', isoDuration((Date.now() - this.startTime) / 1000));
     for (const q of this.questions) {
       this.adapter.writeInteraction(this._interactionIndex(q.id),
         buildInteraction(q, this.state.answers[q.id], resultsById[q.id], this.latency[q.id] ?? 0, true));
     }
-    this.adapter.setValue('cmi.exit', 'normal');
     this.state.submitted = true;
     this.state.lastScore = scored;
+    // With attempts left the session stays open (and resumable) for a retry.
+    const retry = this._canRetry();
+    this.adapter.setValue('cmi.exit', retry ? 'suspend' : 'normal');
     this._persist();
     this.adapter.commit();
-    this.adapter.terminate();
+    if (!retry) this.adapter.terminate();
     this._renderResults(scored);
+  }
+  /** Attempts remain and the learner has not yet passed. */
+  _canRetry() {
+    if (!this.state.submitted || (this.state.retained && this.state.retained.passed)) return false;
+    const max = this.settings.maxAttempts;
+    return !max || max <= 0 || this.state.attempt < max;
+  }
+  _retry() {
+    if (!this._canRetry()) return;
+    const attempt = this.state.attempt + 1;
+    // New interactions append after every one already reported.
+    this.lmsInteractionCount = parseInt(this.adapter.getValue('cmi.interactions._count'), 10) || 0;
+    Object.assign(this.state, { ...this._freshOrder(attempt), attempt, answers: {}, flagged: [], index: 0,
+      submitted: false, lastScore: null, interactionIndex: {}, remainingTime: this.settings.timeLimitSec ?? null });
+    this.latency = {};
+    this.startTime = Date.now();
+    this.adapter.setValue('cmi.exit', 'suspend');
+    this._persist();
+    this._announce(`Attempt ${attempt} started.`);
+    this._renderQuestion();
   }
   _renderResults(scored) {
     scored = scored || this.state.lastScore ||
@@ -382,8 +413,17 @@ export class AssessmentPlayer {
     if (r.showPassFail !== false) screen.append(h('p', { class: scored.passed ? 'sqb-pass' : 'sqb-fail' },
       scored.passed ? (this.settings.passMessage || 'Congratulations, you passed.') : (this.settings.failMessage || 'You did not reach the passing score.')));
     if (r.showCorrectCount) screen.append(h('p', {}, `Correct answers: ${scored.correctCount} of ${scored.results.length}`));
-    const showAnswers = r.showCorrectAnswers && (!r.delayUntilFinalAttempt || this._isFinalAttempt());
+    const kept = this.state.retained;
+    if (r.showScore !== false && kept && kept.raw !== scored.raw)
+      screen.append(h('p', { class: 'sqb-score' }, `Recorded score: ${kept.raw} / ${kept.max} (${kept.percent}%)`));
+    const max = this.settings.maxAttempts;
+    const canRetry = this._canRetry();
+    if (max > 0 && (canRetry || this.state.attempt > 1))
+      screen.append(h('p', { class: 'sqb-attempts' }, `Attempt ${this.state.attempt} of ${max}`));
+    const showAnswers = r.showCorrectAnswers && (!r.delayUntilFinalAttempt || !canRetry);
     if (showAnswers || r.showLearnerResponses) screen.append(this._answerReview(scored, r, showAnswers));
+    if (canRetry) screen.append(h('div', { class: 'sqb-nav' },
+      h('button', { type: 'button', class: 'sqb-btn sqb-primary', onclick: () => this._retry() }, 'Retry assessment')));
     this.root.append(screen);
     screen.querySelector('h2').focus();
     this._announce(scored.passed ? 'You passed the assessment.' : 'Assessment complete.');
@@ -412,12 +452,14 @@ export class AssessmentPlayer {
     }
     return box;
   }
-  _isFinalAttempt() {
-    const max = this.settings.maxAttempts;
-    if (!max || max <= 0) return false;
-    return this.state.attempt >= max;
-  }
   _announce(msg) { this.live.textContent = ''; setTimeout(() => (this.live.textContent = msg), 30); }
+}
+
+/** The score to report across attempts: highest (default), latest or first. */
+function retainScore(prev, cur, retention) {
+  if (!prev || retention === 'latest') return cur;
+  if (retention === 'first') return prev;
+  return cur.scaled > prev.scaled ? cur : prev;
 }
 
 /** The learner's own response in readable form, shown in the answer review. */

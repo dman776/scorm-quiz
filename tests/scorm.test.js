@@ -149,3 +149,9 @@ test('moveIndex moves one element without mutating the input', () => {
   assert.deepEqual(moveIndex(a, 0, 2), ['b', 'c', 'a', 'd']);
   assert.deepEqual(a, ['a', 'b', 'c', 'd']);
 });
+test('retained score survives suspend/resume', () => {
+  const retained = { raw: 3, min: 0, max: 5, scaled: 0.6, percent: 60, passed: false };
+  const st = { order: ['a'], answers: {}, flagged: [], index: 0, submitted: true, attempt: 2, remainingTime: null, answerOrder: null, retained };
+  const back = deserializeState(serializeState(st));
+  assert.deepEqual(back.retained, retained); assert.equal(back.attempt, 2);
+});
